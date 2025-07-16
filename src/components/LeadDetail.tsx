@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { X, Send, DollarSign, Calendar, Clock, Phone, Mail, Car, User, MessageSquare, CreditCard, CheckCircle } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { X, Send, DollarSign, Calendar, Clock, Phone, Mail, Car, User, MessageSquare, CreditCard, CheckCircle, Percent } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface Lead {
@@ -48,7 +48,10 @@ const LeadDetail = ({ lead, onStatusChange, onClose }: LeadDetailProps) => {
     glassType: '',
     serviceDate: '',
     serviceTime: '',
-    notes: ''
+    notes: '',
+    paymentType: 'full',
+    depositAmount: '',
+    depositPercentage: '50'
   });
   const [showQuoteForm, setShowQuoteForm] = useState(false);
 
@@ -74,8 +77,20 @@ const LeadDetail = ({ lead, onStatusChange, onClose }: LeadDetailProps) => {
     '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM'
   ];
 
+  const paymentTypes = [
+    { value: 'full', label: 'Full Payment Required', description: 'Customer pays the full amount upfront' },
+    { value: 'deposit', label: 'Deposit Only', description: 'Customer pays a deposit, balance due on completion' },
+    { value: 'both', label: 'Both Options', description: 'Give customer choice between full payment or deposit' }
+  ];
+
+  const stripLinksFromMessage = (message: string) => {
+    return message.replace(/(https?:\/\/[^\s]+)/g, '[Payment Link]').trim();
+  };
+
   const sendMessage = () => {
     if (!newMessage.trim()) return;
+
+    const cleanMessage = stripLinksFromMessage(newMessage);
 
     // Simulate sending SMS
     toast({
@@ -94,7 +109,7 @@ const LeadDetail = ({ lead, onStatusChange, onClose }: LeadDetailProps) => {
             {
               id: Date.now().toString(),
               sender: 'owner',
-              message: newMessage,
+              message: cleanMessage,
               timestamp: new Date().toISOString()
             }
           ]
@@ -107,6 +122,20 @@ const LeadDetail = ({ lead, onStatusChange, onClose }: LeadDetailProps) => {
     setNewMessage('');
   };
 
+  const generatePaymentLinks = () => {
+    const baseUrl = `https://checkout.stripe.com/demo-payment-${lead.id}`;
+    const fullAmount = parseFloat(quoteData.amount);
+    const depositAmount = quoteData.paymentType === 'deposit' || quoteData.paymentType === 'both' 
+      ? quoteData.depositAmount ? parseFloat(quoteData.depositAmount) 
+      : (fullAmount * parseFloat(quoteData.depositPercentage) / 100)
+      : 0;
+
+    return {
+      fullPayment: `${baseUrl}-full-${fullAmount}`,
+      deposit: depositAmount > 0 ? `${baseUrl}-deposit-${depositAmount}` : null
+    };
+  };
+
   const sendQuote = () => {
     if (!quoteData.amount || !quoteData.glassType || !quoteData.serviceDate || !quoteData.serviceTime) {
       toast({
@@ -116,17 +145,37 @@ const LeadDetail = ({ lead, onStatusChange, onClose }: LeadDetailProps) => {
       return;
     }
 
-    // Simulate creating Stripe payment link
-    const paymentUrl = `https://checkout.stripe.com/demo-payment-${lead.id}`;
+    const paymentLinks = generatePaymentLinks();
+    const fullAmount = parseFloat(quoteData.amount);
     
+    let paymentSection = '';
+    
+    if (quoteData.paymentType === 'full') {
+      paymentSection = `💳 To secure your appointment, please pay the full amount ($${fullAmount}): ${paymentLinks.fullPayment}`;
+    } else if (quoteData.paymentType === 'deposit') {
+      const depositAmount = quoteData.depositAmount ? parseFloat(quoteData.depositAmount) 
+        : (fullAmount * parseFloat(quoteData.depositPercentage) / 100);
+      paymentSection = `💳 To secure your appointment, please pay the deposit ($${depositAmount.toFixed(2)}): ${paymentLinks.deposit}
+Balance of $${(fullAmount - depositAmount).toFixed(2)} due upon completion.`;
+    } else if (quoteData.paymentType === 'both') {
+      const depositAmount = quoteData.depositAmount ? parseFloat(quoteData.depositAmount) 
+        : (fullAmount * parseFloat(quoteData.depositPercentage) / 100);
+      paymentSection = `💳 Choose your payment option:
+
+Option 1 - Pay Full Amount ($${fullAmount}): ${paymentLinks.fullPayment}
+
+Option 2 - Pay Deposit ($${depositAmount.toFixed(2)}): ${paymentLinks.deposit}
+(Balance of $${(fullAmount - depositAmount).toFixed(2)} due upon completion)`;
+    }
+
     const quoteMessage = `Hi ${lead.firstName}! Here's your quote:
 
 🔧 Service: ${quoteData.glassType}
-💰 Price: $${quoteData.amount}
+💰 Total Price: $${quoteData.amount}
 📅 Scheduled: ${quoteData.serviceDate} at ${quoteData.serviceTime}
 ${quoteData.notes ? `📝 Notes: ${quoteData.notes}` : ''}
 
-To secure your appointment, please pay online: ${paymentUrl}
+${paymentSection}
 
 Questions? Just reply to this message!`;
 
@@ -157,7 +206,7 @@ Questions? Just reply to this message!`;
 
     toast({
       title: "Quote Sent!",
-      description: `Quote sent to ${lead.phone} with payment link`
+      description: `Quote sent to ${lead.phone} with payment options`
     });
 
     setShowQuoteForm(false);
@@ -166,7 +215,10 @@ Questions? Just reply to this message!`;
       glassType: '',
       serviceDate: '',
       serviceTime: '',
-      notes: ''
+      notes: '',
+      paymentType: 'full',
+      depositAmount: '',
+      depositPercentage: '50'
     });
   };
 
@@ -356,6 +408,50 @@ Questions? Just reply to this message!`;
             </div>
 
             <div>
+              <Label className="text-xs font-medium mb-3 block">Payment Options</Label>
+              <RadioGroup value={quoteData.paymentType} onValueChange={(value) => setQuoteData(prev => ({ ...prev, paymentType: value }))}>
+                {paymentTypes.map((type) => (
+                  <div key={type.value} className="flex items-start space-x-2 p-3 border rounded-lg hover:bg-white/50">
+                    <RadioGroupItem value={type.value} id={type.value} className="mt-0.5" />
+                    <div className="flex-1">
+                      <Label htmlFor={type.value} className="font-medium text-sm cursor-pointer">
+                        {type.label}
+                      </Label>
+                      <p className="text-xs text-gray-600 mt-1">{type.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </RadioGroup>
+            </div>
+
+            {(quoteData.paymentType === 'deposit' || quoteData.paymentType === 'both') && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Deposit Amount ($)</Label>
+                  <Input
+                    value={quoteData.depositAmount}
+                    onChange={(e) => setQuoteData(prev => ({ ...prev, depositAmount: e.target.value }))}
+                    placeholder={quoteData.amount ? `${(parseFloat(quoteData.amount) * parseFloat(quoteData.depositPercentage) / 100).toFixed(2)}` : '75'}
+                    type="number"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Or Percentage (%)</Label>
+                  <Select value={quoteData.depositPercentage} onValueChange={(value) => setQuoteData(prev => ({ ...prev, depositPercentage: value, depositAmount: '' }))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="25">25%</SelectItem>
+                      <SelectItem value="50">50%</SelectItem>
+                      <SelectItem value="75">75%</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            <div>
               <Label className="text-xs">Additional Notes</Label>
               <Textarea
                 value={quoteData.notes}
@@ -367,7 +463,7 @@ Questions? Just reply to this message!`;
 
             <div className="flex gap-2">
               <Button onClick={sendQuote} size="sm" className="flex-1">
-                Send Quote & Payment Link
+                Send Quote with Payment Options
               </Button>
               <Button onClick={() => setShowQuoteForm(false)} variant="outline" size="sm">
                 Cancel

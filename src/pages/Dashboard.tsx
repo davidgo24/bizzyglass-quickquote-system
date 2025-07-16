@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, MessageSquare, Users, Phone, Mail, Car, Calendar, AlertCircle, CheckCircle, XCircle, Plus, Settings, BarChart3 } from 'lucide-react';
+import { Shield, MessageSquare, Users, Phone, Mail, Car, Calendar, AlertCircle, CheckCircle, XCircle, Plus, Settings, BarChart3, Clock, DollarSign } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import LeadDetail from '@/components/LeadDetail';
 import DashboardStats from '@/components/DashboardStats';
@@ -312,6 +312,10 @@ const Dashboard = () => {
     }
   };
 
+  const handleSelectLead = (lead: Lead) => {
+    setSelectedLead(lead);
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -494,7 +498,7 @@ const Dashboard = () => {
           </TabsContent>
 
           <TabsContent value="overview" className="space-y-6">
-            <QuickActions leads={leads} onSelectLead={setSelectedLead} />
+            <QuickActions leads={leads} onSelectLead={handleSelectLead} />
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-6">
