@@ -88,129 +88,25 @@ const Dashboard = () => {
       setIsAuthenticated(true);
     }
 
-    // Load leads from localStorage
-    const storedLeads = JSON.parse(localStorage.getItem('bizzy_leads') || '[]');
-    
-    // Add enhanced demo leads if none exist
-    if (storedLeads.length === 0) {
-      const demoLeads = [
-        {
-          id: 'GLS-001',
-          firstName: 'John',
-          lastName: 'Smith',
-          phone: '(555) 123-4567',
-          email: 'john@example.com',
-          make: 'Toyota',
-          model: 'Camry',
-          year: '2020',
-          bodyType: 'Sedan',
-          urgency: 'urgent',
-          damageDescription: 'Large crack in windshield from road debris, spreading across driver view',
-          status: 'NEW',
-          createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          messages: [
-            {
-              id: '1',
-              sender: 'client',
-              message: 'Hi, I need my windshield replaced ASAP. The crack is getting worse.',
-              timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-            }
-          ]
-        },
-        {
-          id: 'GLS-002',
-          firstName: 'Sarah',
-          lastName: 'Johnson',
-          phone: '(555) 987-6543',
-          email: 'sarah@example.com',
-          make: 'Honda',
-          model: 'CR-V',
-          year: '2019',
-          bodyType: 'SUV',
-          urgency: 'soon',
-          damageDescription: 'Small chip in windshield, passenger side. Want to fix before it spreads.',
-          status: 'QUOTED',
-          createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          messages: [
-            {
-              id: '1',
-              sender: 'client',
-              message: 'Looking for a quote on windshield repair for a small chip',
-              timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              id: '2',
-              sender: 'owner',
-              message: 'Thanks for contacting us! I can repair that chip for $85. When would work best for you?',
-              timestamp: new Date(Date.now() - 23 * 60 * 60 * 1000).toISOString()
-            }
-          ]
-        },
-        {
-          id: 'GLS-003',
-          firstName: 'Mike',
-          lastName: 'Wilson',
-          phone: '(555) 456-7890',
-          email: 'mike@example.com',
-          make: 'Ford',
-          model: 'F-150',
-          year: '2021',
-          bodyType: 'Truck',
-          urgency: 'emergency',
-          damageDescription: 'Completely shattered windshield from accident. Cannot drive safely.',
-          status: 'NEW',
-          createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-          messages: [
-            {
-              id: '1',
-              sender: 'client',
-              message: 'EMERGENCY: My windshield is completely shattered. Need immediate replacement!',
-              timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString()
-            }
-          ]
-        },
-        {
-          id: 'GLS-004',
-          firstName: 'Emily',
-          lastName: 'Davis',
-          phone: '(555) 321-0987',
-          email: 'emily@example.com',
-          make: 'BMW',
-          model: 'X3',
-          year: '2018',
-          bodyType: 'SUV',
-          urgency: 'flexible',
-          damageDescription: 'Side window replacement needed. Non-urgent.',
-          status: 'PAID',
-          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          messages: [
-            {
-              id: '1',
-              sender: 'client',
-              message: 'Need side window replaced when convenient',
-              timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              id: '2',
-              sender: 'owner',
-              message: 'I can replace that for $180. How does Thursday afternoon work?',
-              timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              id: '3',
-              sender: 'client',
-              message: 'Perfect! Payment sent.',
-              timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-            }
-          ]
+    const fetchLeads = async () => {
+      try {
+        const response = await fetch('/api/leads');
+        if (!response.ok) {
+          throw new Error('Failed to fetch leads');
         }
-      ];
-      
-      localStorage.setItem('bizzy_leads', JSON.stringify(demoLeads));
-      setLeads(demoLeads);
-    } else {
-      setLeads(storedLeads);
-    }
+        const data = await response.json();
+        setLeads(data);
+      } catch (error) {
+        console.error('Error fetching leads:', error);
+        toast({
+          title: "Error fetching leads",
+          description: "Could not load leads from the server.",
+          variant: "destructive"
+        });
+      }
+    };
+
+    fetchLeads();
   }, [navigate]);
 
   useEffect(() => {
@@ -300,17 +196,7 @@ const Dashboard = () => {
     });
   };
 
-  const updateLeadStatus = (leadId: string, newStatus: string) => {
-    const updatedLeads = leads.map(lead => 
-      lead.id === leadId ? { ...lead, status: newStatus } : lead
-    );
-    setLeads(updatedLeads);
-    localStorage.setItem('bizzy_leads', JSON.stringify(updatedLeads));
-    
-    if (selectedLead && selectedLead.id === leadId) {
-      setSelectedLead({ ...selectedLead, status: newStatus });
-    }
-  };
+  
 
   const handleSelectLead = (lead: Lead) => {
     setSelectedLead(lead);
@@ -462,7 +348,7 @@ const Dashboard = () => {
                                 {getStatusBadge(lead.status)}
                                 {getUrgencyBadge(lead.urgency)}
                                 <p className="text-xs text-gray-500">
-                                  {new Date(lead.createdAt).toLocaleDateString()}
+                                  {new Date(lead.createdAt).toLocaleString()}
                                 </p>
                               </div>
                             </div>
@@ -479,7 +365,6 @@ const Dashboard = () => {
                 {selectedLead ? (
                   <LeadDetail 
                     lead={selectedLead} 
-                    onStatusChange={updateLeadStatus}
                     onClose={() => setSelectedLead(null)}
                   />
                 ) : (

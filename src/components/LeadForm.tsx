@@ -161,45 +161,48 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
     }
   };
 
-  const handleSubmit = () => {
-    // Generate a simple lead ID for demonstration
-    const leadId = `GLS-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
-    
-    // Store lead in localStorage for demonstration
-    const leads = JSON.parse(localStorage.getItem('bizzy_leads') || '[]');
-    const newLead = {
-      id: leadId,
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      phone: formData.phone,
-      email: formData.email,
-      make: formData.make,
-      model: formData.model,
-      year: formData.year,
-      bodyType: formData.bodyType,
-      urgency: formData.urgency,
-      damageDescription: `Glass to replace: ${formData.glassToReplace.join(', ')}${formData.addonServices.length ? `. Add-on services: ${formData.addonServices.join(', ')}` : ''}${formData.additionalNotes ? `. Additional notes: ${formData.additionalNotes}` : ''}`,
-      status: 'NEW',
-      createdAt: new Date().toISOString(),
-      messages: [
-        {
-          id: '1',
-          sender: 'system',
-          message: `New lead created via web form. Preferred timing: ${formData.preferredDaysTimes.join(', ')}${formData.preferredDate ? `. Preferred date: ${formData.preferredDate}` : ''}`,
-          timestamp: new Date().toISOString()
-        }
-      ]
-    };
-    
-    leads.push(newLead);
-    localStorage.setItem('bizzy_leads', JSON.stringify(leads));
-    
-    toast({
-      title: "Thanks! We're reviewing your request.",
-      description: "You'll receive a quote shortly via text."
-    });
-    
-    onClose();
+  const handleSubmit = async () => {
+    try {
+      const response = await fetch('/api/leads', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          phone: formData.phone,
+          email: formData.email,
+          make: formData.make,
+          model: formData.model,
+          year: formData.year,
+          bodyType: formData.bodyType,
+          urgency: formData.urgency,
+          damageDescription: `Glass to replace: ${formData.glassToReplace.join(', ')}${formData.addonServices.length ? `. Add-on services: ${formData.addonServices.join(', ')}` : ''}${formData.additionalNotes ? `. Additional notes: ${formData.additionalNotes}` : ''}`,
+          messages: [
+            `New lead created via web form. Preferred timing: ${formData.preferredDaysTimes.join(', ')}${formData.preferredDate ? `. Preferred date: ${formData.preferredDate}` : ''}`
+          ]
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to submit lead');
+      }
+
+      toast({
+        title: "Thanks! We're reviewing your request.",
+        description: "You'll receive a quote shortly via text."
+      });
+
+      onClose();
+    } catch (error) {
+      console.error('Error submitting lead:', error);
+      toast({
+        title: "Error submitting request",
+        description: "Something went wrong. Please try again later.",
+        variant: "destructive"
+      });
+    }
   };
 
   const renderStep = () => {
