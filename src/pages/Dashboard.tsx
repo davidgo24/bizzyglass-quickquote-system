@@ -198,6 +198,13 @@ const Dashboard = () => {
 
   
 
+  const handleLeadUpdate = (updatedLead: Lead) => {
+    setLeads(prevLeads =>
+      prevLeads.map(lead => (lead.id === updatedLead.id ? updatedLead : lead))
+    );
+    setSelectedLead(updatedLead); // Keep the selected lead updated as well
+  };
+
   const handleSelectLead = (lead: Lead) => {
     setSelectedLead(lead);
   };
@@ -366,6 +373,7 @@ const Dashboard = () => {
                   <LeadDetail 
                     lead={selectedLead} 
                     onClose={() => setSelectedLead(null)}
+                    onLeadUpdate={handleLeadUpdate}
                   />
                 ) : (
                   <Card>

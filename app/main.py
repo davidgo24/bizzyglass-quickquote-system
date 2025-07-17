@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 from typing import List
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 from . import models, schemas
@@ -46,7 +46,7 @@ def add_message_to_lead(lead_id: int, message: schemas.MessageCreate, db: Sessio
         "id": str(uuid.uuid4()),
         "sender": "owner",
         "message": message.message,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
     db_lead.messages = db_lead.messages + [new_message]

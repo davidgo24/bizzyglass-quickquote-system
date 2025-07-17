@@ -38,9 +38,10 @@ interface Message {
 interface LeadDetailProps {
   lead: Lead;
   onClose: () => void;
+  onLeadUpdate: (updatedLead: Lead) => void;
 }
 
-const LeadDetail = ({ lead, onClose }: LeadDetailProps) => {
+const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
   const [newMessage, setNewMessage] = useState('');
   const [quoteData, setQuoteData] = useState({
     amount: '',
@@ -113,8 +114,8 @@ const LeadDetail = ({ lead, onClose }: LeadDetailProps) => {
         throw new Error('Failed to send message');
       }
 
-      // This is a temporary solution to update the state. We will improve this later.
-      window.location.reload();
+      const updatedLead = await response.json();
+      onLeadUpdate(updatedLead);
 
     } catch (error) {
       console.error('Error sending message:', error);
@@ -184,8 +185,8 @@ const LeadDetail = ({ lead, onClose }: LeadDetailProps) => {
         throw new Error('Failed to send quote');
       }
 
-      // This is a temporary solution to update the state. We will improve this later.
-      window.location.reload();
+      const updatedLead = await response.json();
+      onLeadUpdate(updatedLead);
 
     } catch (error) {
       console.error('Error sending quote:', error);
@@ -455,7 +456,7 @@ const LeadDetail = ({ lead, onClose }: LeadDetailProps) => {
                     {message.sender === 'owner' ? 'You (Bizzy)' : 'Customer'}
                   </span>
                   <span className="text-xs text-gray-500">
-                    {new Date(message.timestamp).toLocaleTimeString()}
+                    {new Date(message.timestamp).toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles' })}
                   </span>
                 </div>
                 <p className="text-gray-800">{message.message}</p>
