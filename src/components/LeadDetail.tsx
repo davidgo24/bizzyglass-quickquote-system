@@ -798,7 +798,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
                     {message.sender === 'owner' ? 'You (Bizzy)' : 'Customer'}
                   </span>
                   <span className="text-xs text-gray-500">
-                    {new Date(`${message.timestamp}Z`).toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles' })}
+                    {new Date(message.timestamp).toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles' })}
                   </span>
                 </div>
                 <p className="text-gray-800">{message.message}</p>
