@@ -20,7 +20,9 @@ interface FormData {
   firstName: string;
   lastName: string;
   phone: string;
+  confirmPhone: string;
   email: string;
+  confirmEmail: string;
   make: string;
   model: string;
   year: string;
@@ -42,7 +44,9 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
     firstName: '',
     lastName: '',
     phone: '',
+    confirmPhone: '',
     email: '',
+    confirmEmail: '',
     make: '',
     model: '',
     year: '',
@@ -135,16 +139,59 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
     }));
   };
 
-  const validateStep = (stepNumber: number) => {
+  const validatePhoneNumber = (phone: string): boolean => {
+    // Strips non-digits and checks for 10 digits
+    const cleaned = phone.replace(/\D/g, '');
+    return cleaned.length === 10;
+  };
+
+  const validateEmail = (email: string): boolean => {
+    // Basic email regex for format validation
+    const re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    return re.test(String(email).toLowerCase());
+  };
+
+  const validateStep = (stepNumber: number): boolean => {
     switch (stepNumber) {
       case 1:
-        return formData.firstName && formData.lastName && formData.phone && formData.email;
+        if (!formData.firstName || !formData.lastName || !formData.phone || !formData.confirmPhone || !formData.email || !formData.confirmEmail) {
+          return false;
+        }
+
+        const cleanedPhone = formData.phone.replace(/\D/g, '');
+        const cleanedConfirmPhone = formData.confirmPhone.replace(/\D/g, '');
+
+        if (cleanedPhone.length !== 10) {
+          return false;
+        }
+
+        if (cleanedPhone !== cleanedConfirmPhone) {
+          return false;
+        }
+
+        if (!formData.email.includes('@') || !formData.email.includes('.')) {
+          return false;
+        }
+
+        if (formData.email !== formData.confirmEmail) {
+          return false;
+        }
+        return true;
       case 2:
-        return formData.make && formData.model && formData.year && formData.bodyType;
+        if (!formData.make || !formData.model || !formData.year || !formData.bodyType) {
+          return false;
+        }
+        return true;
       case 3:
-        return formData.glassToReplace.length > 0 && formData.urgency;
+        if (formData.glassToReplace.length === 0 || !formData.urgency) {
+          return false;
+        }
+        return true;
       case 4:
-        return formData.preferredDaysTimes.length > 0;
+        if (formData.preferredDaysTimes.length === 0) {
+          return false;
+        }
+        return true;
       default:
         return true;
     }
@@ -154,15 +201,71 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
     if (validateStep(step)) {
       setStep(step + 1);
     } else {
-      toast({
-        title: "Please fill in all required fields",
-        variant: "destructive"
-      });
+      // Determine which toast message to show based on the failed validation
+      switch (step) {
+        case 1:
+          if (!formData.firstName || !formData.lastName || !formData.phone || !formData.confirmPhone || !formData.email || !formData.confirmEmail) {
+            toast({
+              title: "Please fill in all required fields",
+              description: "All contact fields are required.",
+              variant: "destructive"
+            });
+          } else {
+            const cleanedPhone = formData.phone.replace(/\D/g, '');
+            const cleanedConfirmPhone = formData.confirmPhone.replace(/\D/g, '');
+            if (cleanedPhone.length !== 10) {
+              toast({
+                title: "Invalid Phone Number",
+                description: "Please enter a 10-digit phone number (e.g., 5551234567).",
+                variant: "destructive"
+              });
+            } else if (cleanedPhone !== cleanedConfirmPhone) {
+              toast({
+                title: "Phone Numbers Do Not Match",
+                description: "Please ensure both phone number fields match.",
+                variant: "destructive"
+              });
+            } else if (!formData.email.includes('@') || !formData.email.includes('.')) {
+              toast({
+                title: "Invalid Email Address",
+                description: "Please enter a valid email address (e.g., example@domain.com).",
+                variant: "destructive"
+              });
+            } else if (formData.email !== formData.confirmEmail) {
+              toast({
+                title: "Email Addresses Do Not Match",
+                description: "Please ensure both email address fields match.",
+                variant: "destructive"
+              });
+            }
+          }
+          break;
+        case 2:
+          toast({
+            title: "Please fill in all required fields",
+            variant: "destructive"
+          });
+          break;
+        case 3:
+          toast({
+            title: "Please select glass to replace and urgency level",
+            variant: "destructive"
+          });
+          break;
+        case 4:
+          toast({
+            title: "Please select at least one preferred day/time",
+            variant: "destructive"
+          });
+          break;
+      }
     }
   };
 
   const handleSubmit = async () => {
     try {
+      const cleanedPhone = formData.phone.replace(/\D/g, '');
+
       const response = await fetch('/api/leads', {
         method: 'POST',
         headers: {
@@ -171,7 +274,7 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
         body: JSON.stringify({
           firstName: formData.firstName,
           lastName: formData.lastName,
-          phone: formData.phone,
+          phone: cleanedPhone,
           email: formData.email,
           make: formData.make,
           model: formData.model,
@@ -248,9 +351,23 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
                   id="phone"
                   value={formData.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
-                  placeholder="(555) 123-4567"
+                  placeholder="5551234567"
                   className="pl-10"
-                  maxLength={14}
+                  maxLength={10}
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="confirmPhone">Confirm Phone Number *</Label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  id="confirmPhone"
+                  value={formData.confirmPhone}
+                  onChange={(e) => handleInputChange('confirmPhone', e.target.value)}
+                  placeholder="5551234567"
+                  className="pl-10"
+                  maxLength={10}
                 />
               </div>
             </div>
@@ -263,6 +380,20 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
+                  placeholder="john@example.com"
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="confirmEmail">Confirm Email Address *</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  id="confirmEmail"
+                  type="email"
+                  value={formData.confirmEmail}
+                  onChange={(e) => handleInputChange('confirmEmail', e.target.value)}
                   placeholder="john@example.com"
                   className="pl-10"
                 />
