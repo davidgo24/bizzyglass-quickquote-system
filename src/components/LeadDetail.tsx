@@ -37,11 +37,10 @@ interface Message {
 
 interface LeadDetailProps {
   lead: Lead;
-  onStatusChange: (leadId: string, newStatus: string) => void;
   onClose: () => void;
 }
 
-const LeadDetail = ({ lead, onStatusChange, onClose }: LeadDetailProps) => {
+const LeadDetail = ({ lead, onClose }: LeadDetailProps) => {
   const [newMessage, setNewMessage] = useState('');
   const [quoteData, setQuoteData] = useState({
     amount: '',
@@ -84,40 +83,47 @@ const LeadDetail = ({ lead, onStatusChange, onClose }: LeadDetailProps) => {
   ];
 
   const stripLinksFromMessage = (message: string) => {
-    return message.replace(/(https?:\/\/[^\s]+)/g, '[Payment Link]').trim();
+    const words = message.split(' ');
+    const cleanedWords = words.map(word => {
+      if (word.startsWith('http://') || word.startsWith('https://')) {
+        return '[Payment Link]';
+      } else {
+        return word;
+      }
+    });
+    return cleanedWords.join(' ').trim();
   };
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!newMessage.trim()) return;
 
     const cleanMessage = stripLinksFromMessage(newMessage);
 
-    // Simulate sending SMS
-    toast({
-      title: "Message Sent",
-      description: `SMS sent to ${lead.phone}`
-    });
+    try {
+      const response = await fetch(`/api/leads/${lead.id}/messages`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message: cleanMessage }),
+        });
 
-    // Update messages in localStorage (for demo)
-    const leads = JSON.parse(localStorage.getItem('bizzy_leads') || '[]');
-    const updatedLeads = leads.map((l: Lead) => {
-      if (l.id === lead.id) {
-        return {
-          ...l,
-          messages: [
-            ...l.messages,
-            {
-              id: Date.now().toString(),
-              sender: 'owner',
-              message: cleanMessage,
-              timestamp: new Date().toISOString()
-            }
-          ]
-        };
+      if (!response.ok) {
+        throw new Error('Failed to send message');
       }
-      return l;
-    });
-    localStorage.setItem('bizzy_leads', JSON.stringify(updatedLeads));
+
+      // This is a temporary solution to update the state. We will improve this later.
+      window.location.reload();
+
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast({
+        title: "Error sending message",
+        description: "Something went wrong. Please try again later.",
+        variant: "destructive"
+      });
+    }
 
     setNewMessage('');
   };
@@ -136,7 +142,7 @@ const LeadDetail = ({ lead, onStatusChange, onClose }: LeadDetailProps) => {
     };
   };
 
-  const sendQuote = () => {
+  const sendQuote = async () => {
     if (!quoteData.amount || !quoteData.glassType || !quoteData.serviceDate || !quoteData.serviceTime) {
       toast({
         title: "Please fill in all required fields",
@@ -155,59 +161,40 @@ const LeadDetail = ({ lead, onStatusChange, onClose }: LeadDetailProps) => {
     } else if (quoteData.paymentType === 'deposit') {
       const depositAmount = quoteData.depositAmount ? parseFloat(quoteData.depositAmount) 
         : (fullAmount * parseFloat(quoteData.depositPercentage) / 100);
-      paymentSection = `💳 To secure your appointment, please pay the deposit ($${depositAmount.toFixed(2)}): ${paymentLinks.deposit}
-Balance of $${(fullAmount - depositAmount).toFixed(2)} due upon completion.`;
+      paymentSection = `💳 To secure your appointment, please pay the deposit ($${depositAmount.toFixed(2)}): ${paymentLinks.deposit}\nBalance of $${(fullAmount - depositAmount).toFixed(2)} due upon completion.`;
     } else if (quoteData.paymentType === 'both') {
       const depositAmount = quoteData.depositAmount ? parseFloat(quoteData.depositAmount) 
         : (fullAmount * parseFloat(quoteData.depositPercentage) / 100);
-      paymentSection = `💳 Choose your payment option:
-
-Option 1 - Pay Full Amount ($${fullAmount}): ${paymentLinks.fullPayment}
-
-Option 2 - Pay Deposit ($${depositAmount.toFixed(2)}): ${paymentLinks.deposit}
-(Balance of $${(fullAmount - depositAmount).toFixed(2)} due upon completion)`;
+      paymentSection = `💳 Choose your payment option:\n\nOption 1 - Pay Full Amount ($${fullAmount}): ${paymentLinks.fullPayment}\n\nOption 2 - Pay Deposit ($${depositAmount.toFixed(2)}): ${paymentLinks.deposit}\n(Balance of $${(fullAmount - depositAmount).toFixed(2)} due upon completion)`;
     }
 
-    const quoteMessage = `Hi ${lead.firstName}! Here's your quote:
+    const quoteMessage = `Hi ${lead.firstName}! Here's your quote:\n\n🔧 Service: ${quoteData.glassType}\n💰 Total Price: $${quoteData.amount}\n📅 Scheduled: ${quoteData.serviceDate} at ${quoteData.serviceTime}\n${quoteData.notes ? `📝 Notes: ${quoteData.notes}` : ''}\n\n${paymentSection}\n\nQuestions? Just reply to this message!`;
 
-🔧 Service: ${quoteData.glassType}
-💰 Total Price: $${quoteData.amount}
-📅 Scheduled: ${quoteData.serviceDate} at ${quoteData.serviceTime}
-${quoteData.notes ? `📝 Notes: ${quoteData.notes}` : ''}
+    try {
+      const response = await fetch(`/api/leads/${lead.id}/messages`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message: quoteMessage }),
+        });
 
-${paymentSection}
-
-Questions? Just reply to this message!`;
-
-    // Update lead status and add message
-    onStatusChange(lead.id, 'QUOTED');
-    
-    // Add quote message to conversation
-    const leads = JSON.parse(localStorage.getItem('bizzy_leads') || '[]');
-    const updatedLeads = leads.map((l: Lead) => {
-      if (l.id === lead.id) {
-        return {
-          ...l,
-          status: 'QUOTED',
-          messages: [
-            ...l.messages,
-            {
-              id: Date.now().toString(),
-              sender: 'owner',
-              message: quoteMessage,
-              timestamp: new Date().toISOString()
-            }
-          ]
-        };
+      if (!response.ok) {
+        throw new Error('Failed to send quote');
       }
-      return l;
-    });
-    localStorage.setItem('bizzy_leads', JSON.stringify(updatedLeads));
 
-    toast({
-      title: "Quote Sent!",
-      description: `Quote sent to ${lead.phone} with payment options`
-    });
+      // This is a temporary solution to update the state. We will improve this later.
+      window.location.reload();
+
+    } catch (error) {
+      console.error('Error sending quote:', error);
+      toast({
+        title: "Error sending quote",
+        description: "Something went wrong. Please try again later.",
+        variant: "destructive"
+      });
+    }
 
     setShowQuoteForm(false);
     setQuoteData({
@@ -223,7 +210,7 @@ Questions? Just reply to this message!`;
   };
 
   const simulatePayment = () => {
-    onStatusChange(lead.id, 'PAID');
+    
     toast({
       title: "Payment Received!",
       description: "Customer has completed payment via Stripe"
@@ -292,25 +279,6 @@ Questions? Just reply to this message!`;
 
         <Separator />
 
-        {/* Status Management */}
-        <div>
-          <Label className="text-sm font-medium">Update Status</Label>
-          <Select value={lead.status} onValueChange={(value) => onStatusChange(lead.id, value)}>
-            <SelectTrigger className="mt-1">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {statusOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Separator />
-
         {/* Quick Actions */}
         <div className="space-y-2">
           <Label className="text-sm font-medium">Quick Actions</Label>
@@ -339,7 +307,7 @@ Questions? Just reply to this message!`;
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => onStatusChange(lead.id, 'COMPLETED')}
+                
                 className="justify-start"
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
@@ -478,8 +446,8 @@ Questions? Just reply to this message!`;
         <div>
           <Label className="text-sm font-medium">Conversation</Label>
           <div className="mt-2 space-y-3 max-h-40 overflow-y-auto">
-            {lead.messages.map((message) => (
-              <div key={message.id} className={`p-3 rounded-lg text-sm ${
+            {lead.messages && lead.messages.map((message, index) => (
+              <div key={index} className={`p-3 rounded-lg text-sm ${
                 message.sender === 'owner' ? 'bg-blue-100 ml-4' : 'bg-gray-100 mr-4'
               }`}>
                 <div className="flex justify-between items-start mb-1">

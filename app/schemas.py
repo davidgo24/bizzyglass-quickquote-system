@@ -24,11 +24,14 @@ class LeadBase(BaseModel):
 class LeadCreate(LeadBase):
     pass
 
+class MessageCreate(BaseModel):
+    message: str
+
 class Lead(LeadBase):
     id: int
     status: str
     createdAt: datetime
-    messages: Optional[List[str]] = []
+    messages: Optional[List[Message]] = []
 
     class Config:
         orm_mode = True

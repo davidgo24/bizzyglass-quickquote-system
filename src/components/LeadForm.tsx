@@ -180,7 +180,12 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
           urgency: formData.urgency,
           damageDescription: `Glass to replace: ${formData.glassToReplace.join(', ')}${formData.addonServices.length ? `. Add-on services: ${formData.addonServices.join(', ')}` : ''}${formData.additionalNotes ? `. Additional notes: ${formData.additionalNotes}` : ''}`,
           messages: [
-            `New lead created via web form. Preferred timing: ${formData.preferredDaysTimes.join(', ')}${formData.preferredDate ? `. Preferred date: ${formData.preferredDate}` : ''}`
+            {
+              id: Date.now().toString(),
+              sender: 'client',
+              message: `New lead created via web form. Preferred timing: ${formData.preferredDaysTimes.join(', ')}${formData.preferredDate ? `. Preferred date: ${formData.preferredDate}` : ''}`,
+              timestamp: new Date().toISOString()
+            }
           ]
         }),
       });
