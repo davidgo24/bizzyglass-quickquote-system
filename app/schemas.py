@@ -20,6 +20,11 @@ class LeadBase(BaseModel):
     bodyType: str
     urgency: str
     damageDescription: str
+    glassToReplace: Optional[List[str]] = []
+    addonServices: Optional[List[str]] = []
+    preferredDate: Optional[str] = None
+    preferredTime: Optional[str] = None
+    preferredDaysTimes: Optional[List[str]] = []
 
 class LeadCreate(LeadBase):
     pass

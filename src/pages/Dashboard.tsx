@@ -26,6 +26,11 @@ interface Lead {
   status: string;
   createdAt: string;
   messages: Message[];
+  glassToReplace: string[];
+  addonServices: string[];
+  preferredDate: string;
+  preferredTime: string;
+  preferredDaysTimes: string[];
 }
 
 interface Message {

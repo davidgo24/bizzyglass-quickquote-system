@@ -440,6 +440,34 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
             </div>
           </div>
 
+          {lead.glassToReplace && lead.glassToReplace.length > 0 && (
+            <div>
+              <Label className="text-xs font-medium text-gray-500">GLASS TO REPLACE</Label>
+              <p className="text-sm mt-1">{lead.glassToReplace.join(', ')}</p>
+            </div>
+          )}
+
+          {lead.addonServices && lead.addonServices.length > 0 && (
+            <div>
+              <Label className="text-xs font-medium text-gray-500">ADD-ON SERVICES</Label>
+              <p className="text-sm mt-1">{lead.addonServices.join(', ')}</p>
+            </div>
+          )}
+
+          {(lead.preferredDate || lead.preferredTime || (lead.preferredDaysTimes && lead.preferredDaysTimes.length > 0)) && (
+            <div>
+              <Label className="text-xs font-medium text-gray-500">PREFERRED APPOINTMENT</Label>
+              <p className="text-sm mt-1">
+                {lead.preferredDate && `Date: ${lead.preferredDate}`}
+                {lead.preferredDate && lead.preferredTime && `, `}
+                {lead.preferredTime && `Time: ${lead.preferredTime}`}
+                {(lead.preferredDate || lead.preferredTime) && lead.preferredDaysTimes && lead.preferredDaysTimes.length > 0 && ` (`}
+                {lead.preferredDaysTimes && lead.preferredDaysTimes.length > 0 && `Days/Times: ${lead.preferredDaysTimes.join(', ')}`}
+                {(lead.preferredDate || lead.preferredTime) && lead.preferredDaysTimes && lead.preferredDaysTimes.length > 0 && `)`}
+              </p>
+            </div>
+          )}
+
           <div>
             <Label className="text-xs font-medium text-gray-500">DAMAGE DESCRIPTION</Label>
             <p className="text-sm mt-1">{lead.damageDescription}</p>

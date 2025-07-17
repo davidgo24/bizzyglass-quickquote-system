@@ -179,6 +179,11 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
           bodyType: formData.bodyType,
           urgency: formData.urgency,
           damageDescription: `Glass to replace: ${formData.glassToReplace.join(', ')}${formData.addonServices.length ? `. Add-on services: ${formData.addonServices.join(', ')}` : ''}${formData.additionalNotes ? `. Additional notes: ${formData.additionalNotes}` : ''}`,
+          glassToReplace: formData.glassToReplace,
+          addonServices: formData.addonServices,
+          preferredDate: formData.preferredDate,
+          preferredTime: formData.preferredTime,
+          preferredDaysTimes: formData.preferredDaysTimes,
           messages: [
             {
               id: Date.now().toString(),
