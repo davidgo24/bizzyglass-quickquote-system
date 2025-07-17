@@ -43,9 +43,35 @@ interface LeadDetailProps {
 
 const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
   const [newMessage, setNewMessage] = useState('');
+
+  interface ServiceItem {
+    id: string;
+    name: string;
+    price: string;
+    glassType?: "OEM" | "Aftermarket" | "Customer-Supplied";
+  }
+
+  interface AddonItem {
+    id: string;
+    name: string;
+    price: string;
+  }
+
+  interface AppointmentSlot {
+    id: string;
+    date: string;
+    time: string;
+  }
+
+  const [selectedOemServices, setSelectedOemServices] = useState<ServiceItem[]>([]);
+  const [selectedAftermarketServices, setSelectedAftermarketServices] = useState<ServiceItem[]>([]);
+  const [customServices, setCustomServices] = useState<ServiceItem[]>([]);
+  const [selectedAddons, setSelectedAddons] = useState<AddonItem[]>([]);
+  const [customAddons, setCustomAddons] = useState<AddonItem[]>([]);
+  const [appointmentSlots, setAppointmentSlots] = useState<AppointmentSlot[]>([]);
+  const [generatedQuoteMessage, setGeneratedQuoteMessage] = useState('');
+
   const [quoteData, setQuoteData] = useState({
-    amount: '',
-    glassType: '',
     serviceDate: '',
     serviceTime: '',
     notes: '',
@@ -63,13 +89,22 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
     { value: 'CANCELLED', label: 'Cancelled', color: 'bg-red-100 text-red-700' }
   ];
 
-  const glassTypes = [
-    'OEM Windshield',
-    'Aftermarket Windshield',
-    'Side Window',
-    'Rear Window',
-    'Chip Repair',
-    'Crack Repair'
+  const oemGlassOptions = [
+    { name: 'Windshield', defaultPrice: '350' },
+    { name: 'Rear Glass', defaultPrice: '250' },
+    { name: 'Side Window', defaultPrice: '180' },
+  ];
+
+  const aftermarketGlassOptions = [
+    { name: 'Windshield', defaultPrice: '250' },
+    { name: 'Rear Glass', defaultPrice: '180' },
+    { name: 'Side Window', defaultPrice: '120' },
+  ];
+
+  const predefinedAddons = [
+    { name: 'Mobile Calibration', defaultPrice: '60' },
+    { name: 'Tint Matching', defaultPrice: '40' },
+    { name: 'Glass Disposal', defaultPrice: '25' },
   ];
 
   const timeSlots = [
@@ -129,9 +164,19 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
     setNewMessage('');
   };
 
-  const generatePaymentLinks = () => {
+  const calculateTotalPrice = () => {
+    const oemTotal = selectedOemServices.reduce((sum, service) => sum + parseFloat(service.price || '0'), 0);
+    const aftermarketTotal = selectedAftermarketServices.reduce((sum, service) => sum + parseFloat(service.price || '0'), 0);
+    const customServiceTotal = customServices.reduce((sum, service) => sum + parseFloat(service.price || '0'), 0);
+    const addonsTotal = selectedAddons.reduce((sum, addon) => sum + parseFloat(addon.price || '0'), 0);
+    const customAddonsTotal = customAddons.reduce((sum, addon) => sum + parseFloat(addon.price || '0'), 0);
+
+    return (oemTotal + aftermarketTotal + customServiceTotal + addonsTotal + customAddonsTotal).toFixed(2);
+  };
+
+  const generatePaymentLinks = (totalPrice: number) => {
     const baseUrl = `https://checkout.stripe.com/demo-payment-${lead.id}`;
-    const fullAmount = parseFloat(quoteData.amount);
+    const fullAmount = totalPrice;
     const depositAmount = quoteData.paymentType === 'deposit' || quoteData.paymentType === 'both' 
       ? quoteData.depositAmount ? parseFloat(quoteData.depositAmount) 
       : (fullAmount * parseFloat(quoteData.depositPercentage) / 100)
@@ -143,33 +188,67 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
     };
   };
 
+  const handleGenerateQuote = () => {
+    const total = calculateTotalPrice();
+    const paymentLinks = generatePaymentLinks(parseFloat(total));
+
+    let servicesList = '';
+    if (selectedOemServices.length > 0) {
+      servicesList += '\n## OEM Services\n';
+      selectedOemServices.forEach(s => servicesList += `• ${s.name}: $${s.price}\n`);
+    }
+    if (selectedAftermarketServices.length > 0) {
+      servicesList += '\n## Aftermarket Services\n';
+      selectedAftermarketServices.forEach(s => servicesList += `• ${s.name}: $${s.price}\n`);
+    }
+    if (customServices.length > 0) {
+      servicesList += '\n## Custom Services\n';
+      customServices.forEach(s => servicesList += `• ${s.name} (${s.glassType || 'N/A'}): $${s.price}\n`);
+    }
+
+    let addonsList = '';
+    if (selectedAddons.length > 0) {
+      addonsList += '\n## Add-ons\n';
+      selectedAddons.forEach(a => addonsList += `• ${a.name}: $${a.price}\n`);
+    }
+    if (customAddons.length > 0) {
+      addonsList += '\n## Custom Add-ons\n';
+      customAddons.forEach(a => addonsList += `• ${a.name}: $${a.price}\n`);
+    }
+
+    let appointmentList = '';
+    if (appointmentSlots.length > 0) {
+      appointmentList += '\n## Proposed Appointment Times\n';
+      appointmentSlots.forEach(slot => appointmentList += `• ${slot.date} at ${slot.time}\n`);
+      appointmentList += '\n⏳ These time slots are held for 20 minutes and may become unavailable.\n';
+    }
+
+    let paymentSection = '';
+    if (quoteData.paymentType === 'full') {
+      paymentSection = `💳 To secure your appointment, please pay the full amount ($${total}): ${paymentLinks.fullPayment}`;
+    } else if (quoteData.paymentType === 'deposit') {
+      const depositAmount = quoteData.depositAmount ? parseFloat(quoteData.depositAmount) 
+        : (parseFloat(total) * parseFloat(quoteData.depositPercentage) / 100);
+      paymentSection = `💳 To secure your appointment, please pay the deposit ($${depositAmount.toFixed(2)}): ${paymentLinks.deposit}\nBalance of $${(parseFloat(total) - depositAmount).toFixed(2)} due upon completion.`;
+    } else if (quoteData.paymentType === 'both') {
+      const depositAmount = quoteData.depositAmount ? parseFloat(quoteData.depositAmount) 
+        : (parseFloat(total) * parseFloat(quoteData.depositPercentage) / 100);
+      paymentSection = `💳 Choose your payment option:\n\nOption 1 - Pay Full Amount ($${total}): ${paymentLinks.fullPayment}\n\nOption 2 - Pay Deposit ($${depositAmount.toFixed(2)}): ${paymentLinks.deposit}\n(Balance of $${(parseFloat(total) - depositAmount).toFixed(2)} due upon completion)`;
+    }
+
+    const message = `Hi ${lead.firstName}! Here's your quote:\n${servicesList}${addonsList}${appointmentList}\n${paymentSection}\n\nQuestions? Just reply to this message!`;
+    setGeneratedQuoteMessage(message);
+  };
+
   const sendQuote = async () => {
-    if (!quoteData.amount || !quoteData.glassType || !quoteData.serviceDate || !quoteData.serviceTime) {
+    if (!generatedQuoteMessage.trim()) {
       toast({
-        title: "Please fill in all required fields",
+        title: "Quote message is empty",
+        description: "Please generate or type a quote message before sending.",
         variant: "destructive"
       });
       return;
     }
-
-    const paymentLinks = generatePaymentLinks();
-    const fullAmount = parseFloat(quoteData.amount);
-    
-    let paymentSection = '';
-    
-    if (quoteData.paymentType === 'full') {
-      paymentSection = `💳 To secure your appointment, please pay the full amount ($${fullAmount}): ${paymentLinks.fullPayment}`;
-    } else if (quoteData.paymentType === 'deposit') {
-      const depositAmount = quoteData.depositAmount ? parseFloat(quoteData.depositAmount) 
-        : (fullAmount * parseFloat(quoteData.depositPercentage) / 100);
-      paymentSection = `💳 To secure your appointment, please pay the deposit ($${depositAmount.toFixed(2)}): ${paymentLinks.deposit}\nBalance of $${(fullAmount - depositAmount).toFixed(2)} due upon completion.`;
-    } else if (quoteData.paymentType === 'both') {
-      const depositAmount = quoteData.depositAmount ? parseFloat(quoteData.depositAmount) 
-        : (fullAmount * parseFloat(quoteData.depositPercentage) / 100);
-      paymentSection = `💳 Choose your payment option:\n\nOption 1 - Pay Full Amount ($${fullAmount}): ${paymentLinks.fullPayment}\n\nOption 2 - Pay Deposit ($${depositAmount.toFixed(2)}): ${paymentLinks.deposit}\n(Balance of $${(fullAmount - depositAmount).toFixed(2)} due upon completion)`;
-    }
-
-    const quoteMessage = `Hi ${lead.firstName}! Here's your quote:\n\n🔧 Service: ${quoteData.glassType}\n💰 Total Price: $${quoteData.amount}\n📅 Scheduled: ${quoteData.serviceDate} at ${quoteData.serviceTime}\n${quoteData.notes ? `📝 Notes: ${quoteData.notes}` : ''}\n\n${paymentSection}\n\nQuestions? Just reply to this message!`;
 
     try {
       const response = await fetch(`/api/leads/${lead.id}/messages`,
@@ -178,7 +257,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ message: quoteMessage }),
+          body: JSON.stringify({ message: generatedQuoteMessage }),
         });
 
       if (!response.ok) {
@@ -199,8 +278,6 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
 
     setShowQuoteForm(false);
     setQuoteData({
-      amount: '',
-      glassType: '',
       serviceDate: '',
       serviceTime: '',
       notes: '',
@@ -208,6 +285,13 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
       depositAmount: '',
       depositPercentage: '50'
     });
+    setGeneratedQuoteMessage('');
+    setSelectedOemServices([]);
+    setSelectedAftermarketServices([]);
+    setCustomServices([]);
+    setSelectedAddons([]);
+    setCustomAddons([]);
+    setAppointmentSlots([]);
   };
 
   const simulatePayment = () => {
@@ -225,6 +309,97 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
         {statusConfig?.label || status}
       </Badge>
     );
+  };
+
+  const handleServiceChange = (
+    serviceList: ServiceItem[],
+    setServiceList: React.Dispatch<React.SetStateAction<ServiceItem[]>>,
+    service: { name: string; defaultPrice: string; },
+    checked: boolean,
+    glassType?: "OEM" | "Aftermarket"
+  ) => {
+    if (checked) {
+      setServiceList([...serviceList, { id: service.name, name: service.name, price: service.defaultPrice, glassType }]);
+    } else {
+      setServiceList(serviceList.filter(item => item.name !== service.name));
+    }
+  };
+
+  const handleServicePriceChange = (
+    serviceList: ServiceItem[],
+    setServiceList: React.Dispatch<React.SetStateAction<ServiceItem[]>>,
+    id: string,
+    newPrice: string
+  ) => {
+    setServiceList(serviceList.map(service =>
+      service.id === id ? { ...service, price: newPrice } : service
+    ));
+  };
+
+  const addCustomService = () => {
+    setCustomServices([...customServices, { id: `custom-${Date.now()}`, name: '', price: '', glassType: 'Customer-Supplied' }]);
+  };
+
+  const removeCustomService = (id: string) => {
+    setCustomServices(customServices.filter(service => service.id !== id));
+  };
+
+  const handleCustomServiceChange = (id: string, field: keyof ServiceItem, value: string) => {
+    setCustomServices(customServices.map(service =>
+      service.id === id ? { ...service, [field]: value } : service
+    ));
+  };
+
+  const handleAddonChange = (
+    addonList: AddonItem[],
+    setAddonList: React.Dispatch<React.SetStateAction<AddonItem[]>>,
+    addon: { name: string; defaultPrice: string; },
+    checked: boolean
+  ) => {
+    if (checked) {
+      setAddonList([...addonList, { id: addon.name, name: addon.name, price: addon.defaultPrice }]);
+    } else {
+      setAddonList(addonList.filter(item => item.name !== addon.name));
+    }
+  };
+
+  const handleAddonPriceChange = (
+    addonList: AddonItem[],
+    setAddonList: React.Dispatch<React.SetStateAction<AddonItem[]>>,
+    id: string,
+    newPrice: string
+  ) => {
+    setAddonList(addonList.map(addon =>
+      addon.id === id ? { ...addon, price: newPrice } : addon
+    ));
+  };
+
+  const addCustomAddon = () => {
+    setCustomAddons([...customAddons, { id: `custom-addon-${Date.now()}`, name: '', price: '' }]);
+  };
+
+  const removeCustomAddon = (id: string) => {
+    setCustomAddons(customAddons.filter(addon => addon.id !== id));
+  };
+
+  const handleCustomAddonChange = (id: string, field: keyof AddonItem, value: string) => {
+    setCustomAddons(customAddons.map(addon =>
+      addon.id === id ? { ...addon, [field]: value } : addon
+    ));
+  };
+
+  const addAppointmentSlot = () => {
+    setAppointmentSlots([...appointmentSlots, { id: `slot-${Date.now()}`, date: '', time: '' }]);
+  };
+
+  const removeAppointmentSlot = (id: string) => {
+    setAppointmentSlots(appointmentSlots.filter(slot => slot.id !== id));
+  };
+
+  const handleAppointmentSlotChange = (id: string, field: keyof AppointmentSlot, value: string) => {
+    setAppointmentSlots(appointmentSlots.map(slot =>
+      slot.id === id ? { ...slot, [field]: value } : slot
+    ));
   };
 
   return (
@@ -323,59 +498,208 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
           <div className="space-y-4 p-4 bg-blue-50 rounded-lg">
             <h4 className="font-medium text-blue-900">Create Quote</h4>
             
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs">Amount ($)</Label>
-                <Input
-                  value={quoteData.amount}
-                  onChange={(e) => setQuoteData(prev => ({ ...prev, amount: e.target.value }))}
-                  placeholder="150"
-                  type="number"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Glass Type</Label>
-                <Select value={quoteData.glassType} onValueChange={(value) => setQuoteData(prev => ({ ...prev, glassType: value }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {glassTypes.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs">Service Date</Label>
-                <Input
-                  type="date"
-                  value={quoteData.serviceDate}
-                  onChange={(e) => setQuoteData(prev => ({ ...prev, serviceDate: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Service Time</Label>
-                <Select value={quoteData.serviceTime} onValueChange={(value) => setQuoteData(prev => ({ ...prev, serviceTime: value }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {timeSlots.map((time) => (
-                      <SelectItem key={time} value={time}>
-                        {time}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {/* OEM Glass Services */}
+            <div>
+              <Label className="text-sm font-medium">OEM Glass Services</Label>
+              <div className="grid grid-cols-1 gap-2 mt-2">
+                {oemGlassOptions.map((service) => (
+                  <div key={service.name} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedOemServices.some(s => s.name === service.name)}
+                        onChange={(e) => handleServiceChange(selectedOemServices, setSelectedOemServices, service, e.target.checked, 'OEM')}
+                        className="form-checkbox"
+                      />
+                      <Label htmlFor={service.name} className="text-sm cursor-pointer">
+                        {service.name}
+                      </Label>
+                    </div>
+                    <Input
+                      type="number"
+                      placeholder={service.defaultPrice}
+                      value={selectedOemServices.find(s => s.name === service.name)?.price || ''}
+                      onChange={(e) => handleServicePriceChange(selectedOemServices, setSelectedOemServices, service.name, e.target.value)}
+                      className="w-24 text-right"
+                      disabled={!selectedOemServices.some(s => s.name === service.name)}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
 
+            {/* Aftermarket Glass Services */}
+            <div>
+              <Label className="text-sm font-medium">Aftermarket Glass Services</Label>
+              <div className="grid grid-cols-1 gap-2 mt-2">
+                {aftermarketGlassOptions.map((service) => (
+                  <div key={service.name} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedAftermarketServices.some(s => s.name === service.name)}
+                        onChange={(e) => handleServiceChange(selectedAftermarketServices, setSelectedAftermarketServices, service, e.target.checked, 'Aftermarket')}
+                        className="form-checkbox"
+                      />
+                      <Label htmlFor={service.name} className="text-sm cursor-pointer">
+                        {service.name}
+                      </Label>
+                    </div>
+                    <Input
+                      type="number"
+                      placeholder={service.defaultPrice}
+                      value={selectedAftermarketServices.find(s => s.name === service.name)?.price || ''}
+                      onChange={(e) => handleServicePriceChange(selectedAftermarketServices, setSelectedAftermarketServices, service.name, e.target.value)}
+                      className="w-24 text-right"
+                      disabled={!selectedAftermarketServices.some(s => s.name === service.name)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Services */}
+            <div>
+              <Label className="text-sm font-medium">Custom Services</Label>
+              <div className="space-y-2 mt-2">
+                {customServices.map((service) => (
+                  <div key={service.id} className="flex items-center space-x-2">
+                    <Input
+                      value={service.name}
+                      onChange={(e) => handleCustomServiceChange(service.id, 'name', e.target.value)}
+                      placeholder="Service Name"
+                      className="flex-1"
+                    />
+                    <Input
+                      type="number"
+                      value={service.price}
+                      onChange={(e) => handleCustomServiceChange(service.id, 'price', e.target.value)}
+                      placeholder="Price"
+                      className="w-24 text-right"
+                    />
+                    <Select value={service.glassType} onValueChange={(value) => handleCustomServiceChange(service.id, 'glassType', value)}>
+                      <SelectTrigger className="w-[120px]">
+                        <SelectValue placeholder="Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="OEM">OEM</SelectItem>
+                        <SelectItem value="Aftermarket">Aftermarket</SelectItem>
+                        <SelectItem value="Customer-Supplied">Customer-Supplied</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button variant="ghost" size="sm" onClick={() => removeCustomService(service.id)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button variant="outline" size="sm" onClick={addCustomService}>
+                  + Add Custom Service
+                </Button>
+              </div>
+            </div>
+
+            {/* Predefined Add-ons */}
+            <div>
+              <Label className="text-sm font-medium">Add-ons</Label>
+              <div className="grid grid-cols-1 gap-2 mt-2">
+                {predefinedAddons.map((addon) => (
+                  <div key={addon.name} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedAddons.some(a => a.name === addon.name)}
+                        onChange={(e) => handleAddonChange(selectedAddons, setSelectedAddons, addon, e.target.checked)}
+                        className="form-checkbox"
+                      />
+                      <Label htmlFor={addon.name} className="text-sm cursor-pointer">
+                        {addon.name}
+                      </Label>
+                    </div>
+                    <Input
+                      type="number"
+                      placeholder={addon.defaultPrice}
+                      value={selectedAddons.find(a => a.name === addon.name)?.price || ''}
+                      onChange={(e) => handleAddonPriceChange(selectedAddons, setSelectedAddons, addon.name, e.target.value)}
+                      className="w-24 text-right"
+                      disabled={!selectedAddons.some(a => a.name === addon.name)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Add-ons */}
+            <div>
+              <Label className="text-sm font-medium">Custom Add-ons</Label>
+              <div className="space-y-2 mt-2">
+                {customAddons.map((addon) => (
+                  <div key={addon.id} className="flex items-center space-x-2">
+                    <Input
+                      value={addon.name}
+                      onChange={(e) => handleCustomAddonChange(addon.id, 'name', e.target.value)}
+                      placeholder="Add-on Name"
+                      className="flex-1"
+                    />
+                    <Input
+                      type="number"
+                      value={addon.price}
+                      onChange={(e) => handleCustomAddonChange(addon.id, 'price', e.target.value)}
+                      placeholder="Price"
+                      className="w-24 text-right"
+                    />
+                    <Button variant="ghost" size="sm" onClick={() => removeCustomAddon(addon.id)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button variant="outline" size="sm" onClick={addCustomAddon}>
+                  + Add Custom Add-On
+                </Button>
+              </div>
+            </div>
+
+            {/* Appointment Times */}
+            <div>
+              <Label className="text-sm font-medium">Proposed Appointment Times</Label>
+              <div className="space-y-2 mt-2">
+                {appointmentSlots.map((slot) => (
+                  <div key={slot.id} className="flex items-center space-x-2">
+                    <Input
+                      type="date"
+                      value={slot.date}
+                      onChange={(e) => handleAppointmentSlotChange(slot.id, 'date', e.target.value)}
+                      className="flex-1"
+                    />
+                    <Select value={slot.time} onValueChange={(value) => handleAppointmentSlotChange(slot.id, 'time', value)}>
+                      <SelectTrigger className="w-[120px]">
+                        <SelectValue placeholder="Time" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timeSlots.map((time) => (
+                          <SelectItem key={time} value={time}>
+                            {time}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button variant="ghost" size="sm" onClick={() => removeAppointmentSlot(slot.id)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button variant="outline" size="sm" onClick={addAppointmentSlot}>
+                  + Add Date/Time Slot
+                </Button>
+              </div>
+            </div>
+
+            {/* Total Price Display */}
+            <div className="flex justify-between items-center font-bold text-lg">
+              <span>Total Estimated Price:</span>
+              <span>${calculateTotalPrice()}</span>
+            </div>
+
+            {/* Payment Options */}
             <div>
               <Label className="text-xs font-medium mb-3 block">Payment Options</Label>
               <RadioGroup value={quoteData.paymentType} onValueChange={(value) => setQuoteData(prev => ({ ...prev, paymentType: value }))}>
@@ -400,7 +724,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
                   <Input
                     value={quoteData.depositAmount}
                     onChange={(e) => setQuoteData(prev => ({ ...prev, depositAmount: e.target.value }))}
-                    placeholder={quoteData.amount ? `${(parseFloat(quoteData.amount) * parseFloat(quoteData.depositPercentage) / 100).toFixed(2)}` : '75'}
+                    placeholder={calculateTotalPrice() ? `${(parseFloat(calculateTotalPrice()) * parseFloat(quoteData.depositPercentage) / 100).toFixed(2)}` : '75'}
                     type="number"
                   />
                 </div>
@@ -430,6 +754,24 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
               />
             </div>
 
+            {/* Generate Quote Button */}
+            <Button onClick={handleGenerateQuote} className="w-full">
+              Generate Quote ✨
+            </Button>
+
+            {/* Editable Quote Preview */}
+            {generatedQuoteMessage && (
+              <div>
+                <Label className="text-sm font-medium">Quote Message Preview (Editable)</Label>
+                <Textarea
+                  value={generatedQuoteMessage}
+                  onChange={(e) => setGeneratedQuoteMessage(e.target.value)}
+                  rows={10}
+                  className="mt-2"
+                />
+              </div>
+            )}
+
             <div className="flex gap-2">
               <Button onClick={sendQuote} size="sm" className="flex-1">
                 Send Quote with Payment Options
@@ -456,7 +798,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
                     {message.sender === 'owner' ? 'You (Bizzy)' : 'Customer'}
                   </span>
                   <span className="text-xs text-gray-500">
-                    {new Date(message.timestamp).toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles' })}
+                    {new Date(`${message.timestamp}Z`).toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles' })}
                   </span>
                 </div>
                 <p className="text-gray-800">{message.message}</p>
