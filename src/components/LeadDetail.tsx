@@ -10,7 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { X, Send, DollarSign, Calendar, Clock, Phone, Mail, Car, User, MessageSquare, CreditCard, CheckCircle, Percent } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { StripeLinkGenerator } from './stripelinkgenerator';
+import { StripeLinkGenerator } from './stripelinkgenerator'; // Keeping for now, but will be redundant for main flow
 
 interface Lead {
   id: string;
@@ -151,7 +151,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
       }
 
       const updatedLead = await response.json();
-      onLeadUpdate(updatedLead);
+      onLeadUpdate(updatedLead); // Refresh lead data in parent
 
     } catch (error) {
       console.error('Error sending message:', error);
@@ -175,73 +175,104 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
     return (oemTotal + aftermarketTotal + customServiceTotal + addonsTotal + customAddonsTotal).toFixed(2);
   };
 
-  const generatePaymentLinks = (totalPrice: number) => {
-    const baseUrl = `https://checkout.stripe.com/demo-payment-${lead.id}`;
-    const fullAmount = totalPrice;
-    const depositAmount = quoteData.paymentType === 'deposit' || quoteData.paymentType === 'both' 
-      ? quoteData.depositAmount ? parseFloat(quoteData.depositAmount) 
-      : (fullAmount * parseFloat(quoteData.depositPercentage) / 100)
-      : 0;
+  // Helper to generate services summary for backend payload
+  const generateServicesSummaryForBackend = () => {
+    let summaryParts: string[] = [];
 
-    return {
-      fullPayment: `${baseUrl}-full-${fullAmount}`,
-      deposit: depositAmount > 0 ? `${baseUrl}-deposit-${depositAmount}` : null
-    };
-  };
-
-  const handleGenerateQuote = () => {
-    const total = calculateTotalPrice();
-    const paymentLinks = generatePaymentLinks(parseFloat(total));
-
-    let servicesList = '';
     if (selectedOemServices.length > 0) {
-      servicesList += '\n## OEM Services\n';
-      selectedOemServices.forEach(s => servicesList += `• ${s.name}: $${s.price}\n`);
+      summaryParts.push('## OEM Services');
+      selectedOemServices.forEach(s => summaryParts.push(`• ${s.name}: $${s.price}`));
     }
     if (selectedAftermarketServices.length > 0) {
-      servicesList += '\n## Aftermarket Services\n';
-      selectedAftermarketServices.forEach(s => servicesList += `• ${s.name}: $${s.price}\n`);
+      summaryParts.push('## Aftermarket Services');
+      selectedAftermarketServices.forEach(s => summaryParts.push(`• ${s.name}: $${s.price}`));
     }
     if (customServices.length > 0) {
-      servicesList += '\n## Custom Services\n';
-      customServices.forEach(s => servicesList += `• ${s.name} (${s.glassType || 'N/A'}): $${s.price}\n`);
+      summaryParts.push('## Custom Services');
+      customServices.forEach(s => summaryParts.push(`• ${s.name} (${s.glassType || 'N/A'}): $${s.price}`));
     }
-
-    let addonsList = '';
     if (selectedAddons.length > 0) {
-      addonsList += '\n## Add-ons\n';
-      selectedAddons.forEach(a => addonsList += `• ${a.name}: $${a.price}\n`);
+      summaryParts.push('## Add-ons');
+      selectedAddons.forEach(a => summaryParts.push(`• ${a.name}: $${a.price}`));
     }
     if (customAddons.length > 0) {
-      addonsList += '\n## Custom Add-ons\n';
-      customAddons.forEach(a => addonsList += `• ${a.name}: $${a.price}\n`);
+      summaryParts.push('## Custom Add-ons');
+      customAddons.forEach(a => summaryParts.push(`• ${a.name}: $${a.price}`));
     }
-
-    let appointmentList = '';
-    if (appointmentSlots.length > 0) {
-      appointmentList += '\n## Proposed Appointment Times\n';
-      appointmentSlots.forEach(slot => appointmentList += `• ${slot.date} at ${slot.time}\n`);
-      appointmentList += '\n⏳ These time slots are held for 20 minutes and may become unavailable.\n';
-    }
-
-    let paymentSection = '';
-    if (quoteData.paymentType === 'full') {
-      paymentSection = `💳 To secure your appointment, please pay the full amount ($${total}): ${paymentLinks.fullPayment}`;
-    } else if (quoteData.paymentType === 'deposit') {
-      const depositAmount = quoteData.depositAmount ? parseFloat(quoteData.depositAmount) 
-        : (parseFloat(total) * parseFloat(quoteData.depositPercentage) / 100);
-      paymentSection = `💳 To secure your appointment, please pay the deposit ($${depositAmount.toFixed(2)}): ${paymentLinks.deposit}\nBalance of $${(parseFloat(total) - depositAmount).toFixed(2)} due upon completion.`;
-    } else if (quoteData.paymentType === 'both') {
-      const depositAmount = quoteData.depositAmount ? parseFloat(quoteData.depositAmount) 
-        : (parseFloat(total) * parseFloat(quoteData.depositPercentage) / 100);
-      paymentSection = `💳 Choose your payment option:\n\nOption 1 - Pay Full Amount ($${total}): ${paymentLinks.fullPayment}\n\nOption 2 - Pay Deposit ($${depositAmount.toFixed(2)}): ${paymentLinks.deposit}\n(Balance of $${(parseFloat(total) - depositAmount).toFixed(2)} due upon completion)`;
-    }
-
-
-    const message = `Hi ${lead.firstName}! Here's your quote:\n${servicesList}${addonsList}${appointmentList}\n${paymentSection}\n\nQuestions? Just reply to this message!`;
-    setGeneratedQuoteMessage(message);
+    return summaryParts.join('\n');
   };
 
+  // Helper to format appointment slots for backend payload
+  const formatAppointmentSlotsForBackend = () => {
+    return appointmentSlots.map(slot => `${slot.date} at ${slot.time}`);
+  };
+
+
+  // MODIFIED: handleGenerateQuote now calls the backend
+  const handleGenerateQuote = async () => {
+    if (!lead) return;
+
+    const total = parseFloat(calculateTotalPrice());
+    const depositAmount = quoteData.paymentType === 'deposit' || quoteData.paymentType === 'both'
+      ? quoteData.depositAmount ? parseFloat(quoteData.depositAmount)
+      : (total * parseFloat(quoteData.depositPercentage) / 100)
+      : 0;
+
+    const payload = {
+      lead_id: parseInt(lead.id), // Ensure lead_id is an integer
+      total_amount: total,
+      payment_option: quoteData.paymentType,
+      deposit_amount: depositAmount > 0 ? depositAmount : undefined, // Only send if applicable
+      deposit_percentage: quoteData.paymentType === 'deposit' || quoteData.paymentType === 'both' ? parseFloat(quoteData.depositPercentage) : undefined,
+      customer_name: lead.firstName,
+      services_summary: generateServicesSummaryForBackend(),
+      appointment_slots: formatAppointmentSlotsForBackend(),
+      // You can add quoteData.notes here if you want them included in the auto-generated message
+      // e.g., additional_notes: quoteData.notes,
+    };
+
+    try {
+      const response = await fetch('/api/generate-quote-message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate quote message from backend');
+      }
+
+      const data = await response.json();
+      // 'data.quote_message' now contains the real Stripe links from the backend
+      setGeneratedQuoteMessage(data.quote_message);
+
+      toast({
+        title: "Quote Generated!",
+        description: "The message preview has been updated with real links.",
+      });
+
+      // Since the backend already saves the message and sends SMS,
+      // we just need to refresh the lead data on the frontend.
+      // This will update the chat history.
+      const updatedLeadResponse = await fetch(`/api/leads/${lead.id}`);
+      if (updatedLeadResponse.ok) {
+        const updatedLeadData = await updatedLeadResponse.json();
+        onLeadUpdate(updatedLeadData);
+      }
+
+    } catch (error) {
+      console.error('Error generating quote message:', error);
+      toast({
+        title: "Error Generating Quote",
+        description: "Could not generate quote message. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // MODIFIED: sendQuote function - now primarily for confirming and closing the form
   const sendQuote = async () => {
     if (!generatedQuoteMessage.trim()) {
       toast({
@@ -252,31 +283,12 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
       return;
     }
 
-    try {
-      const response = await fetch(`/api/leads/${lead.id}/messages`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ message: generatedQuoteMessage }),
-        });
-
-      if (!response.ok) {
-        throw new Error('Failed to send quote');
-      }
-
-      const updatedLead = await response.json();
-      onLeadUpdate(updatedLead);
-
-    } catch (error) {
-      console.error('Error sending quote:', error);
-      toast({
-        title: "Error sending quote",
-        description: "Something went wrong. Please try again later.",
-        variant: "destructive"
-      });
-    }
+    // The message has already been saved to DB and SMS sent by handleGenerateQuote
+    // This function now just handles UI cleanup and confirmation.
+    toast({
+      title: "Quote Sent!",
+      description: "The quote message has been sent to the customer and saved.",
+    });
 
     setShowQuoteForm(false);
     setQuoteData({
@@ -759,7 +771,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
             </div>
 
             <Button onClick={handleGenerateQuote} className="w-full">
-              Generate Quote 🏎️
+              Generate Quote ✨ {/* This button now triggers API call */}
             </Button>
 
             {generatedQuoteMessage && (
@@ -772,7 +784,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
                   className="mt-2"
                 />
 
-                {/* 🔗 Add this */}
+                {/* This manual generator will become redundant for the main flow */}
                 <div className="mt-4">
                   <StripeLinkGenerator />
                 </div>
@@ -781,13 +793,13 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
 
             <div className="flex gap-2">
               <Button onClick={sendQuote} size="sm" className="flex-1">
-                Send Quote with Payment Options
+                Send Quote with Payment Options {/* This button now confirms and closes */}
               </Button>
               <Button onClick={() => setShowQuoteForm(false)} variant="outline" size="sm">
                 Cancel
               </Button>
             </div>
-          </div> /* This closing div was missing in your original code, related to showQuoteForm */
+          </div>
         )}
 
 
@@ -804,15 +816,14 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
                     {message.sender === 'owner' ? 'You (Bizzy)' : 'Customer'}
                   </span>
                   <span className="text-xs text-gray-500">
-                    {new Date(message.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} {/* FIX IS HERE */}
+                    {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                <p>{message.message}</p>
+                <p className="whitespace-pre-wrap">{message.message}</p>
               </div>
             ))}
           </div>
-
-          <div className="flex items-center mt-4">
+          <div className="mt-4 flex space-x-2">
             <Input
               placeholder="Type a message..."
               value={newMessage}
@@ -822,7 +833,6 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
                   sendMessage();
                 }
               }}
-              className="flex-1 mr-2"
             />
             <Button onClick={sendMessage} size="icon">
               <Send className="h-4 w-4" />
