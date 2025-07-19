@@ -22,7 +22,10 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
+# FIX: Explicitly import the Lead model to ensure it's registered with Base.metadata
 from app.database import Base
+from app.models import Lead # <--- IMPORTANT: Explicitly import your model class(es) here
+
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

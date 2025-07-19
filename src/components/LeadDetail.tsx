@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { X, Send, DollarSign, Calendar, Clock, Phone, Mail, Car, User, MessageSquare, CreditCard, CheckCircle, Percent } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { StripeLinkGenerator } from './stripelinkgenerator';
 
 interface Lead {
   id: string;
@@ -236,6 +237,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
       paymentSection = `💳 Choose your payment option:\n\nOption 1 - Pay Full Amount ($${total}): ${paymentLinks.fullPayment}\n\nOption 2 - Pay Deposit ($${depositAmount.toFixed(2)}): ${paymentLinks.deposit}\n(Balance of $${(parseFloat(total) - depositAmount).toFixed(2)} due upon completion)`;
     }
 
+
     const message = `Hi ${lead.firstName}! Here's your quote:\n${servicesList}${addonsList}${appointmentList}\n${paymentSection}\n\nQuestions? Just reply to this message!`;
     setGeneratedQuoteMessage(message);
   };
@@ -402,7 +404,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
     ));
   };
 
-  return (
+  return(
     <Card className="h-fit">
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-lg">Lead Details</CardTitle>
@@ -439,62 +441,8 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
               {new Date(lead.createdAt).toLocaleString()}
             </div>
           </div>
+          
 
-          {lead.glassToReplace && lead.glassToReplace.length > 0 && (
-            <div>
-              <Label className="text-xs font-medium text-gray-500">GLASS TO REPLACE</Label>
-              <p className="text-sm mt-1">{lead.glassToReplace.join(', ')}</p>
-            </div>
-          )}
-
-          {lead.addonServices && lead.addonServices.length > 0 && (
-            <div>
-              <Label className="text-xs font-medium text-gray-500">ADD-ON SERVICES</Label>
-              <p className="text-sm mt-1">{lead.addonServices.join(', ')}</p>
-            </div>
-          )}
-
-          {(lead.preferredDate || lead.preferredTime || (lead.preferredDaysTimes && lead.preferredDaysTimes.length > 0)) && (
-            <div>
-              <Label className="text-xs font-medium text-gray-500">PREFERRED APPOINTMENT</Label>
-              <p className="text-sm mt-1">
-                {lead.preferredDate && `Date: ${lead.preferredDate}`}
-                {lead.preferredDate && lead.preferredTime && `, `}
-                {lead.preferredTime && `Time: ${lead.preferredTime}`}
-                {(lead.preferredDate || lead.preferredTime) && lead.preferredDaysTimes && lead.preferredDaysTimes.length > 0 && ` (`}
-                {lead.preferredDaysTimes && lead.preferredDaysTimes.length > 0 && `Days/Times: ${lead.preferredDaysTimes.join(', ')}`}
-                {(lead.preferredDate || lead.preferredTime) && lead.preferredDaysTimes && lead.preferredDaysTimes.length > 0 && `)`}
-              </p>
-            </div>
-          )}
-
-          {lead.glassToReplace && lead.glassToReplace.length > 0 && (
-            <div>
-              <Label className="text-xs font-medium text-gray-500">GLASS TO REPLACE</Label>
-              <p className="text-sm mt-1">{lead.glassToReplace.join(', ')}</p>
-            </div>
-          )}
-
-          {lead.addonServices && lead.addonServices.length > 0 && (
-            <div>
-              <Label className="text-xs font-medium text-gray-500">ADD-ON SERVICES</Label>
-              <p className="text-sm mt-1">{lead.addonServices.join(', ')}</p>
-            </div>
-          )}
-
-          {(lead.preferredDate || lead.preferredTime || (lead.preferredDaysTimes && lead.preferredDaysTimes.length > 0)) && (
-            <div>
-              <Label className="text-xs font-medium text-gray-500">PREFERRED APPOINTMENT</Label>
-              <p className="text-sm mt-1">
-                {lead.preferredDate && `Date: ${lead.preferredDate}`}
-                {lead.preferredDate && lead.preferredTime && `, `}
-                {lead.preferredTime && `Time: ${lead.preferredTime}`}
-                {(lead.preferredDate || lead.preferredTime) && lead.preferredDaysTimes && lead.preferredDaysTimes.length > 0 && ` (`}
-                {lead.preferredDaysTimes && lead.preferredDaysTimes.length > 0 && `Days/Times: ${lead.preferredDaysTimes.join(', ')}`}
-                {(lead.preferredDate || lead.preferredTime) && lead.preferredDaysTimes && lead.preferredDaysTimes.length > 0 && `)`}
-              </p>
-            </div>
-          )}
 
           <div>
             <Label className="text-xs font-medium text-gray-500">DAMAGE DESCRIPTION</Label>
@@ -810,12 +758,10 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
               />
             </div>
 
-            {/* Generate Quote Button */}
             <Button onClick={handleGenerateQuote} className="w-full">
               Generate Quote ✨
             </Button>
 
-            {/* Editable Quote Preview */}
             {generatedQuoteMessage && (
               <div>
                 <Label className="text-sm font-medium">Quote Message Preview (Editable)</Label>
@@ -825,6 +771,11 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
                   rows={10}
                   className="mt-2"
                 />
+
+                {/* 🔗 Add this */}
+                <div className="mt-4">
+                  <StripeLinkGenerator />
+                </div>
               </div>
             )}
 
@@ -836,10 +787,9 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
                 Cancel
               </Button>
             </div>
-          </div>
+          </div> /* This closing div was missing in your original code, related to showQuoteForm */
         )}
 
-        <Separator />
 
         {/* Messages */}
         <div>
@@ -854,27 +804,27 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
                     {message.sender === 'owner' ? 'You (Bizzy)' : 'Customer'}
                   </span>
                   <span className="text-xs text-gray-500">
-                    {new Date(message.timestamp).toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles' })}
+                    {new Date(message.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} {/* FIX IS HERE */}
                   </span>
                 </div>
-                <p className="text-gray-800">{message.message}</p>
+                <p>{message.message}</p>
               </div>
             ))}
           </div>
-        </div>
 
-        {/* Send Message */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Send Message as Bizzy</Label>
-          <div className="flex space-x-2">
-            <Textarea
+          <div className="flex items-center mt-4">
+            <Input
+              placeholder="Type a message..."
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type your message..."
-              rows={2}
-              className="flex-1"
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  sendMessage();
+                }
+              }}
+              className="flex-1 mr-2"
             />
-            <Button onClick={sendMessage} size="sm" className="self-end">
+            <Button onClick={sendMessage} size="icon">
               <Send className="h-4 w-4" />
             </Button>
           </div>
