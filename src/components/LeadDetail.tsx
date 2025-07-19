@@ -759,7 +759,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
             </div>
 
             <Button onClick={handleGenerateQuote} className="w-full">
-              Generate Quote ✨
+              Generate Quote 🏎️
             </Button>
 
             {generatedQuoteMessage && (

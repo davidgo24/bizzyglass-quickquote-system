@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +10,29 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { X, Upload, Phone, Mail, Car, Calendar, AlertCircle, Clock } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+
+// These are your CORRECT and UPDATED lists
+const glassOptions = [
+  'Windshield',
+  'Front Side Window (Driver)',
+  'Front Side Window (Passenger)',
+  'Rear Side Window (Driver)',
+  'Rear Side Window (Passenger)',
+  'Quarter Glass',
+  'Vent Window',
+  'Rear Window',
+  'Sunroof',
+  'Panoramic Roof',
+  'Other'
+];
+
+const addonServices = [
+  'Window Tinting',
+  'ADAS Calibration',
+  'Windshield Washer Fluid Top-off',
+  'Rain Sensor Calibration',
+  'OEM Glass Upgrade (Select if you would prefer OEM glass)'
+];
 
 interface LeadFormProps {
   onClose: () => void;
@@ -62,34 +84,16 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
     additionalNotes: ''
   });
 
+  
   const carMakes = [
     'Acura', 'Audi', 'BMW', 'Buick', 'Cadillac', 'Chevrolet', 'Chrysler', 'Dodge',
     'Ford', 'GMC', 'Honda', 'Hyundai', 'Infiniti', 'Jeep', 'Kia', 'Lexus',
-    'Lincoln', 'Mazda', 'Mercedes-Benz', 'Mitsubishi', 'Nissan', 'Ram', 'Subaru',
+    'Lincoln', 'Mazda', 'Mercedes-Benz', 'Mitsubishi', 'Nissan', 'Ram', 'Subaru', 'Scion',
     'Tesla', 'Toyota', 'Volkswagen', 'Volvo', 'Other'
   ];
 
   const bodyTypes = [
     'Sedan', 'SUV', 'Truck', 'Coupe', 'Convertible', 'Hatchback', 'Wagon', 'Van', 'Other'
-  ];
-
-  const glassOptions = [
-    'Windshield',
-    'Front Side Window (Driver)',
-    'Front Side Window (Passenger)',
-    'Rear Side Window (Driver)',
-    'Rear Side Window (Passenger)',
-    'Rear Window',
-    'Sunroof',
-    'Quarter Glass'
-  ];
-
-  const addonServices = [
-    'Window Tinting',
-    'ADAS Calibration',
-    'Windshield Washer Fluid Top-off',
-    'Interior Vacuum',
-    'Rain Sensor Calibration'
   ];
 
   const urgencyLevels = [
@@ -113,6 +117,7 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
     'Saturday Morning', 'Saturday Afternoon', 'Saturday Evening',
     'Sunday Morning', 'Sunday Afternoon', 'Sunday Evening'
   ];
+
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -458,7 +463,7 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
               </div>
             </div>
             <div>
-              <Label htmlFor="vin">VIN Number</Label>
+              <Label htmlFor="vin">VIN # - Please attempt to provide for quicker and accurate quotes! Thank you 😀</Label>
               <Input
                 id="vin"
                 value={formData.vin}
@@ -475,7 +480,7 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
           <div className="space-y-4">
             <div>
               <Label className="text-sm font-medium">Glass to Replace * (Select all that apply)</Label>
-              <div className="grid grid-cols-1 gap-2 mt-2 max-h-48 overflow-y-auto">
+              <div className="grid grid-cols-1 gap-2 mt-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md p-2"> {/* Added border and padding */}
                 {glassOptions.map((glass) => (
                   <div key={glass} className="flex items-center space-x-2">
                     <Checkbox
@@ -493,7 +498,7 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
 
             <div>
               <Label className="text-sm font-medium">Add-on Services (Optional)</Label>
-              <div className="grid grid-cols-1 gap-2 mt-2">
+              <div className="grid grid-cols-1 gap-2 mt-2 border border-gray-200 rounded-md p-2"> {/* Added border and padding */}
                 {addonServices.map((service) => (
                   <div key={service} className="flex items-center space-x-2">
                     <Checkbox
@@ -560,7 +565,7 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
 
             <div>
               <Label className="text-sm font-medium">Preferred Days/Times * (Select all that work)</Label>
-              <div className="grid grid-cols-1 gap-2 mt-2 max-h-48 overflow-y-auto">
+              <div className="grid grid-cols-1 gap-2 mt-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md p-2"> {/* Added border and padding */}
                 {preferredDaysOptions.map((dayTime) => (
                   <div key={dayTime} className="flex items-center space-x-2">
                     <Checkbox

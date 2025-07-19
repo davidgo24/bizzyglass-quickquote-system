@@ -1,8 +1,9 @@
 from fastapi import FastAPI, HTTPException, status, Depends
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import datetime, timezone # Import timezone
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified # Import flag_modified
 
 import stripe
 import os
@@ -154,13 +155,11 @@ def create_new_lead(lead_data: LeadCreate, db: Session = Depends(get_db)):
         id="1",
         sender="owner",
         message=initial_message_body,
-        # FIX: Ensure timestamp is UTC for consistency
         timestamp=datetime.now(timezone.utc).isoformat()
     )
 
     db_lead = DBLead(
         status="NEW",
-        # FIX: Ensure createdAt is UTC for consistency
         createdAt=datetime.now(timezone.utc),
         messages=[initial_message.dict()],
         **lead_data.dict()
@@ -176,26 +175,34 @@ def create_new_lead(lead_data: LeadCreate, db: Session = Depends(get_db)):
 
 @app.post("/api/leads/{lead_id}/messages", response_model=Lead)
 def add_message_to_lead(lead_id: int, message_data: MessageCreate, db: Session = Depends(get_db)):
+    print(f"DEBUG: add_message_to_lead - Received message for lead {lead_id}: {message_data.message[:100]}...")
     lead = db.query(DBLead).filter(DBLead.id == lead_id).first()
     if not lead:
+        print(f"ERROR: add_message_to_lead - Lead {lead_id} not found for message update.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found")
 
     if lead.messages is None:
         lead.messages = []
+    
+    print(f"DEBUG: add_message_to_lead - Lead {lead_id} messages BEFORE update: {len(lead.messages)} messages. Content: {lead.messages}")
 
     new_message = Message(
         id=str(len(lead.messages) + 1),
         sender="owner",
         message=message_data.message,
-        # FIX: Ensure timestamp is UTC for consistency
         timestamp=datetime.now(timezone.utc).isoformat()
     )
     
     lead.messages.append(new_message.dict())
     
+    # IMPORTANT FIX: Tell SQLAlchemy that the 'messages' JSONB column has been modified
+    flag_modified(lead, "messages")
+
     db.add(lead)
     db.commit()
     db.refresh(lead)
+
+    print(f"DEBUG: add_message_to_lead - Lead {lead_id} messages AFTER update: {len(lead.messages)} messages. Content: {lead.messages}")
 
     send_sms(lead.phone, new_message.message)
     return lead
@@ -226,9 +233,10 @@ def create_checkout_session(data: StripeCheckoutRequest):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @app.post("/api/generate-quote-message")
-def generate_quote_message(payload: QuotePayload):
+def generate_quote_message(payload: QuotePayload, db: Session = Depends(get_db)):
     full_url = None
     deposit_url = None
+    quote_message_body = ""
 
     try:
         if payload.payment_option == "full" or payload.payment_option == "both":
@@ -252,7 +260,7 @@ def generate_quote_message(payload: QuotePayload):
         if payload.payment_option not in ["full", "deposit", "both"]:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payment option selected.")
 
-        parts = [f"Hello {payload.customer_name}, here's your quote for the services below:\n"]
+        parts = [f"Hi {payload.customer_name}! Here's your quote:\n"]
         parts.append(payload.services_summary)
         
         if full_url:
@@ -265,8 +273,42 @@ def generate_quote_message(payload: QuotePayload):
         else:
             parts.append("\n\n📅 Please contact us to schedule your service.")
 
+        quote_message_body = "\n".join(parts)
+
+        print(f"DEBUG: generate_quote_message - Generated quote message: {quote_message_body[:100]}...")
+
+        lead = db.query(DBLead).filter(DBLead.id == payload.lead_id).first()
+        if not lead:
+            print(f"ERROR: generate_quote_message - Lead {payload.lead_id} not found for message update.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found for message update")
+
+        if lead.messages is None:
+            lead.messages = []
+        
+        print(f"DEBUG: generate_quote_message - Lead {payload.lead_id} messages BEFORE update: {len(lead.messages)} messages. Content: {lead.messages}")
+
+        new_message = Message(
+            id=str(len(lead.messages) + 1),
+            sender="owner",
+            message=quote_message_body,
+            timestamp=datetime.now(timezone.utc).isoformat()
+        )
+        
+        lead.messages.append(new_message.dict())
+        
+        # IMPORTANT FIX: Tell SQLAlchemy that the 'messages' JSONB column has been modified
+        flag_modified(lead, "messages")
+
+        db.add(lead)
+        db.commit()
+        db.refresh(lead)
+
+        print(f"DEBUG: generate_quote_message - Lead {payload.lead_id} messages AFTER update: {len(lead.messages)} messages. Content: {lead.messages}")
+
+        send_sms(lead.phone, quote_message_body)
+
         return {
-            "quote_message": "\n".join(parts),
+            "quote_message": quote_message_body,
             "full_url": full_url,
             "deposit_url": deposit_url,
         }

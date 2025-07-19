@@ -61,7 +61,7 @@ export function StripeLinkGenerator() {
 
       {link && (
         <div className="text-sm text-green-700 break-all">
-          ✅ <a href={link} target="_blank" rel="noopener noreferrer">{link}</a>
+          <a href={link} target="_blank" rel="noopener noreferrer">{link}</a>
         </div>
       )}
     </div>
