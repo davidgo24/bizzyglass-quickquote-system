@@ -3,11 +3,11 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
-from sqlalchemy.orm.attributes import flag_modified # Import flag_modified
+from sqlalchemy.orm.attributes import flag_modified
 
 import stripe
 import os
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware # Corrected: CORSMiddleware
 from dotenv import load_dotenv
 from twilio.rest import Client
 
@@ -23,7 +23,7 @@ load_dotenv()
 app = FastAPI()
 
 app.add_middleware(
-    CORSMiddleware,
+    CORSMiddleware, # Corrected: CORSMiddleware
     allow_origins=["http://localhost:8080"],
     allow_credentials=True,
     allow_methods=["*"],
@@ -105,6 +105,11 @@ class LeadCreate(LeadBase):
 class MessageCreate(BaseModel):
     message: str
 
+# NEW: Schema for sending the final quote message
+class FinalQuoteMessagePayload(BaseModel):
+    lead_id: int
+    message_content: str # The final message to save and send
+
 class QuotePayload(BaseModel):
     lead_id: int
     total_amount: float
@@ -114,6 +119,9 @@ class QuotePayload(BaseModel):
     customer_name: str
     services_summary: str
     appointment_slots: Optional[List[str]] = []
+    invoice_description: Optional[str] = None
+    make: str
+    model: str
 
 class StripeCheckoutRequest(BaseModel):
     lead_id: str
@@ -195,7 +203,6 @@ def add_message_to_lead(lead_id: int, message_data: MessageCreate, db: Session =
     
     lead.messages.append(new_message.dict())
     
-    # IMPORTANT FIX: Tell SQLAlchemy that the 'messages' JSONB column has been modified
     flag_modified(lead, "messages")
 
     db.add(lead)
@@ -233,17 +240,45 @@ def create_checkout_session(data: StripeCheckoutRequest):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @app.post("/api/generate-quote-message")
-def generate_quote_message(payload: QuotePayload, db: Session = Depends(get_db)):
+def generate_quote_message(payload: QuotePayload): # Removed db dependency, no longer saves/sends here
     full_url = None
     deposit_url = None
     quote_message_body = ""
+
+    # Construct the base detailed description for the invoice
+    base_invoice_details = f"Service for {payload.customer_name} ({payload.make} {payload.model})"
+    if payload.services_summary:
+        # Clean up Markdown headers for a more concise invoice description
+        cleaned_services_summary = payload.services_summary.replace('## OEM Services', '').replace('## Aftermarket Services', '').replace('## Custom Services', '').replace('## Add-ons', '').replace('## Custom Add-ons', '').strip()
+        # Replace bullet points with commas for a more compact list
+        cleaned_services_summary = cleaned_services_summary.replace('\n• ', ', ').replace('\n', ', ').strip()
+        if cleaned_services_summary:
+            base_invoice_details += f" - Services: {cleaned_services_summary}"
+
+    # Determine the final invoice description based on payment type and notes
+    invoice_description_full = f"Full Payment: {base_invoice_details}"
+    invoice_description_deposit = f"Deposit: {base_invoice_details}"
+
+    if payload.invoice_description and payload.invoice_description.strip():
+        # If additional notes are provided, append them to the rich description
+        invoice_description_full += f" - {payload.invoice_description.strip()}"
+        invoice_description_deposit += f" - {payload.invoice_description.strip()}"
+
+    # Ensure descriptions don't exceed Stripe's typical limit (around 200-250 chars)
+    # Truncate if necessary, adding ellipsis
+    max_stripe_description_length = 200
+    if len(invoice_description_full) > max_stripe_description_length:
+        invoice_description_full = invoice_description_full[:max_stripe_description_length-3] + "..."
+    if len(invoice_description_deposit) > max_stripe_description_length:
+        invoice_description_deposit = invoice_description_deposit[:max_stripe_description_length-3] + "..."
+
 
     try:
         if payload.payment_option == "full" or payload.payment_option == "both":
             full_url = create_checkout_session(StripeCheckoutRequest(
                 lead_id=str(payload.lead_id),
                 full_amount=payload.total_amount,
-                description=f"{payload.customer_name} - Full Payment",
+                description=invoice_description_full,
                 mode="full"
             ))["checkout_url"]
 
@@ -253,7 +288,7 @@ def generate_quote_message(payload: QuotePayload, db: Session = Depends(get_db))
             deposit_url = create_checkout_session(StripeCheckoutRequest(
                 lead_id=str(payload.lead_id),
                 full_amount=payload.deposit_amount,
-                description=f"{payload.customer_name} - Deposit",
+                description=invoice_description_deposit,
                 mode="deposit"
             ))["checkout_url"]
         
@@ -277,35 +312,8 @@ def generate_quote_message(payload: QuotePayload, db: Session = Depends(get_db))
 
         print(f"DEBUG: generate_quote_message - Generated quote message: {quote_message_body[:100]}...")
 
-        lead = db.query(DBLead).filter(DBLead.id == payload.lead_id).first()
-        if not lead:
-            print(f"ERROR: generate_quote_message - Lead {payload.lead_id} not found for message update.")
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found for message update")
-
-        if lead.messages is None:
-            lead.messages = []
-        
-        print(f"DEBUG: generate_quote_message - Lead {payload.lead_id} messages BEFORE update: {len(lead.messages)} messages. Content: {lead.messages}")
-
-        new_message = Message(
-            id=str(len(lead.messages) + 1),
-            sender="owner",
-            message=quote_message_body,
-            timestamp=datetime.now(timezone.utc).isoformat()
-        )
-        
-        lead.messages.append(new_message.dict())
-        
-        # IMPORTANT FIX: Tell SQLAlchemy that the 'messages' JSONB column has been modified
-        flag_modified(lead, "messages")
-
-        db.add(lead)
-        db.commit()
-        db.refresh(lead)
-
-        print(f"DEBUG: generate_quote_message - Lead {payload.lead_id} messages AFTER update: {len(lead.messages)} messages. Content: {lead.messages}")
-
-        send_sms(lead.phone, quote_message_body)
+        # Removed DB save and SMS send from here.
+        # This endpoint now ONLY generates the message and URLs for the frontend preview.
 
         return {
             "quote_message": quote_message_body,
@@ -318,3 +326,38 @@ def generate_quote_message(payload: QuotePayload, db: Session = Depends(get_db))
     except Exception as e:
         print(f"Error generating quote message: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to generate quote: {e}")
+
+
+# NEW ENDPOINT: To save the final message and send SMS
+@app.post("/api/send-final-quote", response_model=Lead)
+def send_final_quote(payload: FinalQuoteMessagePayload, db: Session = Depends(get_db)):
+    print(f"DEBUG: send_final_quote - Received final message for lead {payload.lead_id}: {payload.message_content[:100]}...")
+    lead = db.query(DBLead).filter(DBLead.id == payload.lead_id).first()
+    if not lead:
+        print(f"ERROR: send_final_quote - Lead {payload.lead_id} not found for message update.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found")
+
+    if lead.messages is None:
+        lead.messages = []
+    
+    print(f"DEBUG: send_final_quote - Lead {payload.lead_id} messages BEFORE update: {len(lead.messages)} messages. Content: {lead.messages}")
+
+    new_message = Message(
+        id=str(len(lead.messages) + 1),
+        sender="owner",
+        message=payload.message_content, # Use the message content from the payload
+        timestamp=datetime.now(timezone.utc).isoformat()
+    )
+    
+    lead.messages.append(new_message.dict())
+    
+    flag_modified(lead, "messages")
+
+    db.add(lead)
+    db.commit()
+    db.refresh(lead)
+
+    print(f"DEBUG: send_final_quote - Lead {payload.lead_id} messages AFTER update: {len(lead.messages)} messages. Content: {lead.messages}")
+
+    send_sms(lead.phone, new_message.message)
+    return lead

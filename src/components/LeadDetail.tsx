@@ -10,7 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { X, Send, DollarSign, Calendar, Clock, Phone, Mail, Car, User, MessageSquare, CreditCard, CheckCircle, Percent } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { StripeLinkGenerator } from './stripelinkgenerator'; // Keeping for now, but will be redundant for main flow
+import { StripeLinkGenerator } from './stripelinkgenerator';
 
 interface Lead {
   id: string;
@@ -208,7 +208,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
   };
 
 
-  // MODIFIED: handleGenerateQuote now calls the backend
+  // MODIFIED: handleGenerateQuote now ONLY generates the message for preview
   const handleGenerateQuote = async () => {
     if (!lead) return;
 
@@ -218,17 +218,20 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
       : (total * parseFloat(quoteData.depositPercentage) / 100)
       : 0;
 
+    const invoiceDescription = quoteData.notes.trim() !== '' ? quoteData.notes.trim() : undefined;
+
     const payload = {
-      lead_id: parseInt(lead.id), // Ensure lead_id is an integer
+      lead_id: parseInt(lead.id),
       total_amount: total,
       payment_option: quoteData.paymentType,
-      deposit_amount: depositAmount > 0 ? depositAmount : undefined, // Only send if applicable
+      deposit_amount: depositAmount > 0 ? depositAmount : undefined,
       deposit_percentage: quoteData.paymentType === 'deposit' || quoteData.paymentType === 'both' ? parseFloat(quoteData.depositPercentage) : undefined,
       customer_name: lead.firstName,
       services_summary: generateServicesSummaryForBackend(),
       appointment_slots: formatAppointmentSlotsForBackend(),
-      // You can add quoteData.notes here if you want them included in the auto-generated message
-      // e.g., additional_notes: quoteData.notes,
+      invoice_description: invoiceDescription,
+      make: lead.make,
+      model: lead.model,
     };
 
     try {
@@ -245,22 +248,14 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
       }
 
       const data = await response.json();
-      // 'data.quote_message' now contains the real Stripe links from the backend
-      setGeneratedQuoteMessage(data.quote_message);
+      setGeneratedQuoteMessage(data.quote_message); // Set the preview text
 
       toast({
-        title: "Quote Generated!",
-        description: "The message preview has been updated with real links.",
+        title: "Quote Preview Generated!",
+        description: "Review the message below before sending.",
       });
 
-      // Since the backend already saves the message and sends SMS,
-      // we just need to refresh the lead data on the frontend.
-      // This will update the chat history.
-      const updatedLeadResponse = await fetch(`/api/leads/${lead.id}`);
-      if (updatedLeadResponse.ok) {
-        const updatedLeadData = await updatedLeadResponse.json();
-        onLeadUpdate(updatedLeadData);
-      }
+      // NO DB SAVE OR SMS SEND HERE, ONLY PREVIEW GENERATION
 
     } catch (error) {
       console.error('Error generating quote message:', error);
@@ -272,7 +267,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
     }
   };
 
-  // MODIFIED: sendQuote function - now primarily for confirming and closing the form
+  // MODIFIED: sendQuote function - now handles actual saving to DB and SMS sending
   const sendQuote = async () => {
     if (!generatedQuoteMessage.trim()) {
       toast({
@@ -283,29 +278,55 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
       return;
     }
 
-    // The message has already been saved to DB and SMS sent by handleGenerateQuote
-    // This function now just handles UI cleanup and confirmation.
-    toast({
-      title: "Quote Sent!",
-      description: "The quote message has been sent to the customer and saved.",
-    });
+    try {
+      const response = await fetch('/api/send-final-quote', { // NEW ENDPOINT
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          lead_id: parseInt(lead.id),
+          message_content: generatedQuoteMessage, // Send the message from the editable preview
+        }),
+      });
 
-    setShowQuoteForm(false);
-    setQuoteData({
-      serviceDate: '',
-      serviceTime: '',
-      notes: '',
-      paymentType: 'full',
-      depositAmount: '',
-      depositPercentage: '50'
-    });
-    setGeneratedQuoteMessage('');
-    setSelectedOemServices([]);
-    setSelectedAftermarketServices([]);
-    setCustomServices([]);
-    setSelectedAddons([]);
-    setCustomAddons([]);
-    setAppointmentSlots([]);
+      if (!response.ok) {
+        throw new Error('Failed to send final quote');
+      }
+
+      const updatedLead = await response.json();
+      onLeadUpdate(updatedLead); // Refresh lead data to show new message in chat
+
+      toast({
+        title: "Quote Sent!",
+        description: "The quote message has been sent to the customer and saved.",
+      });
+
+      setShowQuoteForm(false);
+      setQuoteData({
+        serviceDate: '',
+        serviceTime: '',
+        notes: '',
+        paymentType: 'full',
+        depositAmount: '',
+        depositPercentage: '50'
+      });
+      setGeneratedQuoteMessage('');
+      setSelectedOemServices([]);
+      setSelectedAftermarketServices([]);
+      setCustomServices([]);
+      setSelectedAddons([]);
+      setCustomAddons([]);
+      setAppointmentSlots([]);
+
+    } catch (error) {
+      console.error('Error sending final quote:', error);
+      toast({
+        title: "Error Sending Quote",
+        description: "Something went wrong. Please try again later.",
+        variant: "destructive"
+      });
+    }
   };
 
   const simulatePayment = () => {
@@ -765,7 +786,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
               <Textarea
                 value={quoteData.notes}
                 onChange={(e) => setQuoteData(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Any special instructions..."
+                placeholder="Add notes for the invoice (e.g., 'Urgent Repair', 'Customer requested OEM glass')"
                 rows={2}
               />
             </div>
@@ -784,7 +805,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
                   className="mt-2"
                 />
 
-                {/* This manual generator will become redundant for the main flow */}
+                {/* This manual generator will become redundant for the main flow, but kept for ad-hoc */}
                 <div className="mt-4">
                   <StripeLinkGenerator />
                 </div>
