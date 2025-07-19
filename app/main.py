@@ -1,15 +1,23 @@
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, Depends
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import datetime
-from app.routes import stripe_routes
+from datetime import datetime, timezone # Import timezone
+from sqlalchemy.orm import Session
+
 import stripe
 import os
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from twilio.rest import Client
 
+from app.database import engine, Base, get_db
+from app.models import Lead as DBLead
+from app.routes import stripe_routes
+from app.schemas import LeadCreate, MessageCreate, QuotePayload, StripeCheckoutRequest, Lead, Message
+
+
 load_dotenv()
+
 
 app = FastAPI()
 
@@ -22,6 +30,7 @@ app.add_middleware(
 )
 
 app.include_router(stripe_routes.router)
+
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 if not stripe.api_key:
@@ -43,6 +52,7 @@ else:
     if not TWILIO_PHONE_NUMBER:
         print("WARNING: TWILIO_PHONE_NUMBER is also not set.")
 
+
 def send_sms(to_number: str, body: str):
     if not to_number.startswith('+'):
         to_number = f"+1{to_number.replace(' ', '').replace('-', '')}"
@@ -63,6 +73,7 @@ def send_sms(to_number: str, body: str):
             print(f"Twilio Error Code: {e.code}")
         if hasattr(e, 'msg'):
             print(f"Twilio Error Message: {e.msg}")
+
 
 class Message(BaseModel):
     id: str
@@ -119,67 +130,75 @@ class Lead(LeadBase):
     class Config:
         orm_mode = True
 
-in_memory_leads: List[Lead] = []
-next_lead_id = 1
 
 @app.get("/api/leads", response_model=List[Lead])
-def get_all_leads():
-    return in_memory_leads
+def get_all_leads(db: Session = Depends(get_db)):
+    leads = db.query(DBLead).all()
+    return leads
 
 @app.get("/api/leads/{lead_id}", response_model=Lead)
-def get_single_lead(lead_id: int):
-    for lead in in_memory_leads:
-        if lead.id == lead_id:
-            return lead
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found")
+def get_single_lead(lead_id: int, db: Session = Depends(get_db)):
+    lead = db.query(DBLead).filter(DBLead.id == lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found")
+    return lead
 
 @app.post("/api/leads", response_model=Lead, status_code=status.HTTP_201_CREATED)
-def create_new_lead(lead_data: LeadCreate):
-    global next_lead_id
-    
-    # Create the initial message object
+def create_new_lead(lead_data: LeadCreate, db: Session = Depends(get_db)):
     initial_message_body = (
         f"Hi {lead_data.firstName}, thanks for your inquiry with BizzyGlass! "
         f"We're reviewing your request and will get back to you shortly."
     )
+    
     initial_message = Message(
-        id="1", # First message, ID 1
-        sender="system", # Or 'owner' if you consider it from your side
+        id="1",
+        sender="owner",
         message=initial_message_body,
-        timestamp=datetime.now().isoformat()
+        # FIX: Ensure timestamp is UTC for consistency
+        timestamp=datetime.now(timezone.utc).isoformat()
     )
 
-    new_lead = Lead(
-        id=next_lead_id,
+    db_lead = DBLead(
         status="NEW",
-        createdAt=datetime.now(),
-        messages=[initial_message], # Initialize with the first message
+        # FIX: Ensure createdAt is UTC for consistency
+        createdAt=datetime.now(timezone.utc),
+        messages=[initial_message.dict()],
         **lead_data.dict()
     )
-    in_memory_leads.append(new_lead)
-    next_lead_id += 1
+    
+    db.add(db_lead)
+    db.commit()
+    db.refresh(db_lead)
 
-    # Send initial SMS to the customer
-    send_sms(new_lead.phone, initial_message_body)
+    send_sms(db_lead.phone, initial_message_body)
 
-    return new_lead
+    return db_lead
 
 @app.post("/api/leads/{lead_id}/messages", response_model=Lead)
-def add_message_to_lead(lead_id: int, message_data: MessageCreate):
-    for lead in in_memory_leads:
-        if lead.id == lead_id:
-            new_message = Message(
-                id=str(len(lead.messages) + 1),
-                sender="owner",
-                message=message_data.message,
-                timestamp=datetime.now().isoformat()
-            )
-            lead.messages.append(new_message)
+def add_message_to_lead(lead_id: int, message_data: MessageCreate, db: Session = Depends(get_db)):
+    lead = db.query(DBLead).filter(DBLead.id == lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found")
 
-            # Send the message content (e.g., quote) as an SMS to the customer
-            send_sms(lead.phone, new_message.message)
-            return lead
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found")
+    if lead.messages is None:
+        lead.messages = []
+
+    new_message = Message(
+        id=str(len(lead.messages) + 1),
+        sender="owner",
+        message=message_data.message,
+        # FIX: Ensure timestamp is UTC for consistency
+        timestamp=datetime.now(timezone.utc).isoformat()
+    )
+    
+    lead.messages.append(new_message.dict())
+    
+    db.add(lead)
+    db.commit()
+    db.refresh(lead)
+
+    send_sms(lead.phone, new_message.message)
+    return lead
 
 
 @app.post("/api/create-checkout-session")

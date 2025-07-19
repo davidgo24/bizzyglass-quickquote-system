@@ -1,4 +1,3 @@
-
 from pydantic import BaseModel
 from datetime import datetime
 from typing import List, Optional
@@ -31,6 +30,25 @@ class LeadCreate(LeadBase):
 
 class MessageCreate(BaseModel):
     message: str
+
+# NEW: QuotePayload model moved from main.py
+class QuotePayload(BaseModel):
+    lead_id: int
+    total_amount: float
+    payment_option: str  # 'full', 'deposit', 'both'
+    deposit_amount: Optional[float] = None
+    deposit_percentage: Optional[float] = None
+    customer_name: str
+    services_summary: str
+    appointment_slots: Optional[List[str]] = []
+
+# NEW: StripeCheckoutRequest model moved from main.py
+class StripeCheckoutRequest(BaseModel):
+    lead_id: str
+    full_amount: float
+    deposit_amount: Optional[float] = None
+    description: str
+    mode: str  # "full", "deposit", "both"
 
 class Lead(LeadBase):
     id: int
