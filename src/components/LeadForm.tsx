@@ -48,7 +48,7 @@ interface FormData {
   make: string;
   model: string;
   year: string;
-  vin: string;
+  vin: string; // Already here, good!
   bodyType: string;
   glassToReplace: string[];
   addonServices: string[];
@@ -72,7 +72,7 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
     make: '',
     model: '',
     year: '',
-    vin: '',
+    vin: '', // Initialized to empty string
     bodyType: '',
     glassToReplace: [],
     addonServices: [],
@@ -186,6 +186,7 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
         if (!formData.make || !formData.model || !formData.year || !formData.bodyType) {
           return false;
         }
+        // VIN is optional, so no validation needed here for it to pass
         return true;
       case 3:
         if (formData.glassToReplace.length === 0 || !formData.urgency) {
@@ -284,6 +285,7 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
           make: formData.make,
           model: formData.model,
           year: formData.year,
+          vin: formData.vin, // <--- ADDED VIN HERE!
           bodyType: formData.bodyType,
           urgency: formData.urgency,
           damageDescription: `Glass to replace: ${formData.glassToReplace.join(', ')}${formData.addonServices.length ? `. Add-on services: ${formData.addonServices.join(', ')}` : ''}${formData.additionalNotes ? `. Additional notes: ${formData.additionalNotes}` : ''}`,
@@ -292,6 +294,10 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
           preferredDate: formData.preferredDate,
           preferredTime: formData.preferredTime,
           preferredDaysTimes: formData.preferredDaysTimes,
+          // Photos are not sent directly in this JSON payload,
+          // they would require a separate multipart/form-data upload.
+          // additionalNotes is already part of damageDescription for now,
+          // but could be sent separately if backend schema allows.
           messages: [
             {
               id: Date.now().toString(),
@@ -480,7 +486,7 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
           <div className="space-y-4">
             <div>
               <Label className="text-sm font-medium">Glass to Replace * (Select all that apply)</Label>
-              <div className="grid grid-cols-1 gap-2 mt-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md p-2"> {/* Added border and padding */}
+              <div className="grid grid-cols-1 gap-2 mt-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md p-2">
                 {glassOptions.map((glass) => (
                   <div key={glass} className="flex items-center space-x-2">
                     <Checkbox
@@ -498,7 +504,7 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
 
             <div>
               <Label className="text-sm font-medium">Add-on Services (Optional)</Label>
-              <div className="grid grid-cols-1 gap-2 mt-2 border border-gray-200 rounded-md p-2"> {/* Added border and padding */}
+              <div className="grid grid-cols-1 gap-2 mt-2 border border-gray-200 rounded-md p-2">
                 {addonServices.map((service) => (
                   <div key={service} className="flex items-center space-x-2">
                     <Checkbox
@@ -565,7 +571,7 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
 
             <div>
               <Label className="text-sm font-medium">Preferred Days/Times * (Select all that work)</Label>
-              <div className="grid grid-cols-1 gap-2 mt-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md p-2"> {/* Added border and padding */}
+              <div className="grid grid-cols-1 gap-2 mt-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md p-2">
                 {preferredDaysOptions.map((dayTime) => (
                   <div key={dayTime} className="flex items-center space-x-2">
                     <Checkbox

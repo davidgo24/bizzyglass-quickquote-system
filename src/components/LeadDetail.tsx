@@ -27,6 +27,13 @@ interface Lead {
   status: string;
   createdAt: string;
   messages: Message[];
+  // NEW FIELDS from backend
+  vin?: string; // Optional VIN
+  glassToReplace?: string[]; // List of glass parts
+  addonServices?: string[]; // List of addon services
+  preferredDate?: string; // Preferred date
+  preferredTime?: string; // Preferred time (e.g., "Morning", "Afternoon")
+  preferredDaysTimes?: string[]; // List of preferred days/times (e.g., ["Monday 9am-12pm", "Wednesday 1pm-5pm"])
 }
 
 interface Message {
@@ -75,7 +82,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
   const [quoteData, setQuoteData] = useState({
     serviceDate: '',
     serviceTime: '',
-    notes: '',
+    notes: '', // This will be used for the invoice description
     paymentType: 'full',
     depositAmount: '',
     depositPercentage: '50'
@@ -255,7 +262,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
         description: "Review the message below before sending.",
       });
 
-      // NO DB SAVE OR SMS SEND HERE, ONLY PREVIEW GENERATION
+      // IMPORTANT: NO DB SAVE OR SMS SEND HERE, ONLY PREVIEW GENERATION
 
     } catch (error) {
       console.error('Error generating quote message:', error);
@@ -456,7 +463,9 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
             {getStatusBadge(lead.status)}
           </div>
           
+          {/* Contact Information */}
           <div className="space-y-2 text-sm">
+            <Label className="text-xs font-medium text-gray-500">CONTACT INFORMATION</Label>
             <div className="flex items-center text-gray-600">
               <Phone className="h-4 w-4 mr-2" />
               {lead.phone}
@@ -465,28 +474,92 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
               <Mail className="h-4 w-4 mr-2" />
               {lead.email}
             </div>
+          </div>
+
+          <Separator />
+
+          {/* Vehicle Details */}
+          <div className="space-y-2 text-sm">
+            <Label className="text-xs font-medium text-gray-500">VEHICLE DETAILS</Label>
             <div className="flex items-center text-gray-600">
               <Car className="h-4 w-4 mr-2" />
               {lead.year} {lead.make} {lead.model} ({lead.bodyType})
             </div>
+            {lead.vin && ( // Display VIN only if provided
+              <div className="flex items-center text-gray-600">
+                <span className="font-semibold mr-2">VIN:</span> {lead.vin}
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Request Details */}
+          <div className="space-y-2">
+            <Label className="text-xs font-medium text-gray-500">REQUEST DETAILS</Label>
+            <div>
+              <Label className="text-sm font-medium text-gray-700">Damage Description:</Label>
+              <p className="text-sm mt-1">{lead.damageDescription}</p>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-gray-700">Urgency:</Label>
+              <Badge variant="outline" className="mt-1">
+                {lead.urgency}
+              </Badge>
+            </div>
+            {lead.glassToReplace && lead.glassToReplace.length > 0 && (
+              <div>
+                <Label className="text-sm font-medium text-gray-700">Glass to Replace:</Label>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {lead.glassToReplace.map((item, idx) => (
+                    <Badge key={idx} variant="secondary">{item}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            {lead.addonServices && lead.addonServices.length > 0 && (
+              <div>
+                <Label className="text-sm font-medium text-gray-700">Add-on Services:</Label>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {lead.addonServices.map((item, idx) => (
+                    <Badge key={idx} variant="secondary">{item}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Preferred Availability */}
+          <div className="space-y-2 text-sm">
+            <Label className="text-xs font-medium text-gray-500">PREFERRED AVAILABILITY</Label>
             <div className="flex items-center text-gray-600">
               <Clock className="h-4 w-4 mr-2" />
-              {new Date(lead.createdAt).toLocaleString()}
+              Lead Created: {new Date(lead.createdAt).toLocaleString()}
             </div>
-          </div>
-          
-
-
-          <div>
-            <Label className="text-xs font-medium text-gray-500">DAMAGE DESCRIPTION</Label>
-            <p className="text-sm mt-1">{lead.damageDescription}</p>
-          </div>
-
-          <div>
-            <Label className="text-xs font-medium text-gray-500">URGENCY</Label>
-            <Badge variant="outline" className="mt-1">
-              {lead.urgency}
-            </Badge>
+            {lead.preferredDate && (
+              <div className="flex items-center text-gray-600">
+                <Calendar className="h-4 w-4 mr-2" />
+                Preferred Date: {lead.preferredDate}
+              </div>
+            )}
+            {lead.preferredTime && (
+              <div className="flex items-center text-gray-600">
+                <Clock className="h-4 w-4 mr-2" />
+                Preferred Time: {lead.preferredTime}
+              </div>
+            )}
+            {lead.preferredDaysTimes && lead.preferredDaysTimes.length > 0 && (
+              <div>
+                <Label className="text-sm font-medium text-gray-700">Preferred Days/Times:</Label>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {lead.preferredDaysTimes.map((item, idx) => (
+                    <Badge key={idx} variant="secondary">{item}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

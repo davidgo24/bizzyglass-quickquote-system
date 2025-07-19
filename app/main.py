@@ -7,14 +7,14 @@ from sqlalchemy.orm.attributes import flag_modified
 
 import stripe
 import os
-from fastapi.middleware.cors import CORSMiddleware # Corrected: CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from twilio.rest import Client
 
 from app.database import engine, Base, get_db
 from app.models import Lead as DBLead
 from app.routes import stripe_routes
-from app.schemas import LeadCreate, MessageCreate, QuotePayload, StripeCheckoutRequest, Lead, Message
+from app.schemas import LeadCreate, MessageCreate, QuotePayload, StripeCheckoutRequest, Lead, Message, FinalQuoteMessagePayload
 
 
 load_dotenv()
@@ -23,7 +23,7 @@ load_dotenv()
 app = FastAPI()
 
 app.add_middleware(
-    CORSMiddleware, # Corrected: CORSMiddleware
+    CORSMiddleware,
     allow_origins=["http://localhost:8080"],
     allow_credentials=True,
     allow_methods=["*"],
@@ -98,6 +98,7 @@ class LeadBase(BaseModel):
     preferredDate: Optional[str] = None
     preferredTime: Optional[str] = None
     preferredDaysTimes: Optional[List[str]] = []
+    vin: Optional[str] = None # Ensure this is present in your schemas.py as well
 
 class LeadCreate(LeadBase):
     pass
@@ -105,10 +106,9 @@ class LeadCreate(LeadBase):
 class MessageCreate(BaseModel):
     message: str
 
-# NEW: Schema for sending the final quote message
 class FinalQuoteMessagePayload(BaseModel):
     lead_id: int
-    message_content: str # The final message to save and send
+    message_content: str
 
 class QuotePayload(BaseModel):
     lead_id: int
@@ -150,6 +150,7 @@ def get_single_lead(lead_id: int, db: Session = Depends(get_db)):
     lead = db.query(DBLead).filter(DBLead.id == lead_id).first()
     if not lead:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found")
+    db.refresh(lead) # <--- ADDED THIS LINE
     return lead
 
 @app.post("/api/leads", response_model=Lead, status_code=status.HTTP_201_CREATED)
@@ -240,32 +241,25 @@ def create_checkout_session(data: StripeCheckoutRequest):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @app.post("/api/generate-quote-message")
-def generate_quote_message(payload: QuotePayload): # Removed db dependency, no longer saves/sends here
+def generate_quote_message(payload: QuotePayload):
     full_url = None
     deposit_url = None
     quote_message_body = ""
 
-    # Construct the base detailed description for the invoice
     base_invoice_details = f"Service for {payload.customer_name} ({payload.make} {payload.model})"
     if payload.services_summary:
-        # Clean up Markdown headers for a more concise invoice description
         cleaned_services_summary = payload.services_summary.replace('## OEM Services', '').replace('## Aftermarket Services', '').replace('## Custom Services', '').replace('## Add-ons', '').replace('## Custom Add-ons', '').strip()
-        # Replace bullet points with commas for a more compact list
         cleaned_services_summary = cleaned_services_summary.replace('\n• ', ', ').replace('\n', ', ').strip()
         if cleaned_services_summary:
             base_invoice_details += f" - Services: {cleaned_services_summary}"
 
-    # Determine the final invoice description based on payment type and notes
     invoice_description_full = f"Full Payment: {base_invoice_details}"
     invoice_description_deposit = f"Deposit: {base_invoice_details}"
 
     if payload.invoice_description and payload.invoice_description.strip():
-        # If additional notes are provided, append them to the rich description
         invoice_description_full += f" - {payload.invoice_description.strip()}"
         invoice_description_deposit += f" - {payload.invoice_description.strip()}"
 
-    # Ensure descriptions don't exceed Stripe's typical limit (around 200-250 chars)
-    # Truncate if necessary, adding ellipsis
     max_stripe_description_length = 200
     if len(invoice_description_full) > max_stripe_description_length:
         invoice_description_full = invoice_description_full[:max_stripe_description_length-3] + "..."
@@ -312,9 +306,6 @@ def generate_quote_message(payload: QuotePayload): # Removed db dependency, no l
 
         print(f"DEBUG: generate_quote_message - Generated quote message: {quote_message_body[:100]}...")
 
-        # Removed DB save and SMS send from here.
-        # This endpoint now ONLY generates the message and URLs for the frontend preview.
-
         return {
             "quote_message": quote_message_body,
             "full_url": full_url,
@@ -328,7 +319,6 @@ def generate_quote_message(payload: QuotePayload): # Removed db dependency, no l
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to generate quote: {e}")
 
 
-# NEW ENDPOINT: To save the final message and send SMS
 @app.post("/api/send-final-quote", response_model=Lead)
 def send_final_quote(payload: FinalQuoteMessagePayload, db: Session = Depends(get_db)):
     print(f"DEBUG: send_final_quote - Received final message for lead {payload.lead_id}: {payload.message_content[:100]}...")
@@ -345,7 +335,7 @@ def send_final_quote(payload: FinalQuoteMessagePayload, db: Session = Depends(ge
     new_message = Message(
         id=str(len(lead.messages) + 1),
         sender="owner",
-        message=payload.message_content, # Use the message content from the payload
+        message=payload.message_content,
         timestamp=datetime.now(timezone.utc).isoformat()
     )
     
