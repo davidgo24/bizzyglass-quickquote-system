@@ -27,13 +27,12 @@ interface Lead {
   status: string;
   createdAt: string;
   messages: Message[];
-  // NEW FIELDS from backend
-  vin?: string; // Optional VIN
-  glassToReplace?: string[]; // List of glass parts
-  addonServices?: string[]; // List of addon services
-  preferredDate?: string; // Preferred date
-  preferredTime?: string; // Preferred time (e.g., "Morning", "Afternoon")
-  preferredDaysTimes?: string[]; // List of preferred days/times (e.g., ["Monday 9am-12pm", "Wednesday 1pm-5pm"])
+  vin?: string;
+  glassToReplace?: string[];
+  addonServices?: string[];
+  preferredDate?: string;
+  preferredTime?: string;
+  preferredDaysTimes?: string[];
 }
 
 interface Message {
@@ -82,7 +81,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
   const [quoteData, setQuoteData] = useState({
     serviceDate: '',
     serviceTime: '',
-    notes: '', // This will be used for the invoice description
+    notes: '',
     paymentType: 'full',
     depositAmount: '',
     depositPercentage: '50'
@@ -182,7 +181,6 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
     return (oemTotal + aftermarketTotal + customServiceTotal + addonsTotal + customAddonsTotal).toFixed(2);
   };
 
-  // Helper to generate services summary for backend payload
   const generateServicesSummaryForBackend = () => {
     let summaryParts: string[] = [];
 
@@ -209,13 +207,10 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
     return summaryParts.join('\n');
   };
 
-  // Helper to format appointment slots for backend payload
   const formatAppointmentSlotsForBackend = () => {
     return appointmentSlots.map(slot => `${slot.date} at ${slot.time}`);
   };
 
-
-  // MODIFIED: handleGenerateQuote now ONLY generates the message for preview
   const handleGenerateQuote = async () => {
     if (!lead) return;
 
@@ -255,14 +250,12 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
       }
 
       const data = await response.json();
-      setGeneratedQuoteMessage(data.quote_message); // Set the preview text
+      setGeneratedQuoteMessage(data.quote_message);
 
       toast({
         title: "Quote Preview Generated!",
         description: "Review the message below before sending.",
       });
-
-      // IMPORTANT: NO DB SAVE OR SMS SEND HERE, ONLY PREVIEW GENERATION
 
     } catch (error) {
       console.error('Error generating quote message:', error);
@@ -274,7 +267,6 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
     }
   };
 
-  // MODIFIED: sendQuote function - now handles actual saving to DB and SMS sending
   const sendQuote = async () => {
     if (!generatedQuoteMessage.trim()) {
       toast({
@@ -286,14 +278,14 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
     }
 
     try {
-      const response = await fetch('/api/send-final-quote', { // NEW ENDPOINT
+      const response = await fetch('/api/send-final-quote', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           lead_id: parseInt(lead.id),
-          message_content: generatedQuoteMessage, // Send the message from the editable preview
+          message_content: generatedQuoteMessage,
         }),
       });
 
@@ -302,7 +294,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
       }
 
       const updatedLead = await response.json();
-      onLeadUpdate(updatedLead); // Refresh lead data to show new message in chat
+      onLeadUpdate(updatedLead);
 
       toast({
         title: "Quote Sent!",
@@ -485,7 +477,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
               <Car className="h-4 w-4 mr-2" />
               {lead.year} {lead.make} {lead.model} ({lead.bodyType})
             </div>
-            {lead.vin && ( // Display VIN only if provided
+            {lead.vin && (
               <div className="flex items-center text-gray-600">
                 <span className="font-semibold mr-2">VIN:</span> {lead.vin}
               </div>
@@ -499,7 +491,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
             <Label className="text-xs font-medium text-gray-500">REQUEST DETAILS</Label>
             <div>
               <Label className="text-sm font-medium text-gray-700">Damage Description:</Label>
-              <p className="text-sm mt-1">{lead.damageDescription}</p>
+              <p className="text-sm mt-1 break-words">{lead.damageDescription}</p> {/* Added break-words */}
             </div>
             <div>
               <Label className="text-sm font-medium text-gray-700">Urgency:</Label>
@@ -913,7 +905,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
                     {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                <p className="whitespace-pre-wrap">{message.message}</p>
+                <p className="whitespace-pre-wrap break-words">{message.message}</p> {/* Added break-words */}
               </div>
             ))}
           </div>

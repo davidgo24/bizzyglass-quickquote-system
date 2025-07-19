@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, MessageSquare, Users, Phone, Mail, Car, Calendar, AlertCircle, CheckCircle, XCircle, Plus, Settings, BarChart3, Clock, DollarSign } from 'lucide-react';
+import { Shield, MessageSquare, Users, Phone, Mail, Car, Calendar, AlertCircle, CheckCircle, XCircle, Plus, Settings, BarChart3, Clock, DollarSign, Menu, X } from 'lucide-react'; // Added Menu and X icons
 import { useNavigate } from 'react-router-dom';
 import LeadDetail from '@/components/LeadDetail';
 import DashboardStats from '@/components/DashboardStats';
@@ -31,6 +31,7 @@ interface Lead {
   preferredDate: string;
   preferredTime: string;
   preferredDaysTimes: string[];
+  vin?: string; // Ensure VIN is here if it's part of the Lead interface
 }
 
 interface Message {
@@ -51,6 +52,7 @@ const Dashboard = () => {
   const [sortBy, setSortBy] = useState('newest');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeTab, setActiveTab] = useState('inbox');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // State for mobile menu
 
   const statusOptions = [
     { value: 'NEW', label: 'New', color: 'bg-blue-100 text-blue-700' },
@@ -201,8 +203,6 @@ const Dashboard = () => {
     });
   };
 
-  
-
   const handleLeadUpdate = (updatedLead: Lead) => {
     setLeads(prevLeads =>
       prevLeads.map(lead => (lead.id === updatedLead.id ? updatedLead : lead))
@@ -229,18 +229,21 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Enhanced Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-40">
+      <header className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-40 md:px-6 md:py-4"> {/* Adjusted padding for mobile */}
         <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-3">
-            <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-lg p-2">
-              <Shield className="h-6 w-6" />
+          {/* Logo and Title */}
+          <div className="flex items-center space-x-2 md:space-x-3"> {/* Adjusted spacing for mobile */}
+            <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-lg p-1.5 md:p-2"> {/* Adjusted padding for mobile */}
+              <Shield className="h-5 w-5 md:h-6 md:w-6" /> {/* Adjusted icon size for mobile */}
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">BizzyGlass Pro</h1>
-              <p className="text-gray-600">Advanced Lead Management Dashboard</p>
+              <h1 className="text-lg font-bold text-gray-900 md:text-2xl">BizzyGlass Pro</h1> {/* Adjusted font size for mobile */}
+              <p className="text-gray-600 text-xs md:text-sm">Advanced Lead Management Dashboard</p> {/* Adjusted font size for mobile */}
             </div>
           </div>
-          <div className="flex items-center space-x-3">
+
+          {/* Desktop Navigation (hidden on small screens) */}
+          <div className="hidden md:flex items-center space-x-3">
             <Badge variant="outline" className="text-green-600 border-green-600">
               Live
             </Badge>
@@ -256,10 +259,58 @@ const Dashboard = () => {
               Logout
             </Button>
           </div>
+
+          {/* Mobile Menu Button (visible on small screens) */}
+          <div className="md:hidden">
+            <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(true)}>
+              <Menu className="h-6 w-6" />
+            </Button>
+          </div>
         </div>
       </header>
 
-      <div className="p-6">
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex justify-end">
+          <div className="bg-white w-64 h-full shadow-lg p-4 flex flex-col space-y-4 animate-slide-in-right">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Menu</h2>
+              <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)}>
+                <X className="h-6 w-6" />
+              </Button>
+            </div>
+            <Button variant="ghost" className="justify-start" onClick={() => { navigate('/'); setIsMobileMenuOpen(false); }}>
+              <Car className="h-4 w-4 mr-2" />
+              View Site
+            </Button>
+            <Button variant="ghost" className="justify-start" onClick={() => setIsMobileMenuOpen(false)}>
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
+            <Button variant="ghost" className="justify-start" onClick={handleLogout}>
+              Logout
+            </Button>
+            <div className="mt-auto text-center text-xs text-gray-500">
+              <Badge variant="outline" className="text-green-600 border-green-600">
+                Live
+              </Badge>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add a simple keyframe animation for the slide-in effect */}
+      <style>{`
+        @keyframes slideInRight {
+          from { transform: translateX(100%); }
+          to { transform: translateX(0); }
+        }
+        .animate-slide-in-right {
+          animation: slideInRight 0.3s ease-out forwards;
+        }
+      `}</style>
+
+      <div className="p-4 md:p-6"> {/* Adjusted padding for mobile */}
         {/* Dashboard Stats */}
         <DashboardStats leads={leads} />
 
@@ -280,12 +331,12 @@ const Dashboard = () => {
           </TabsList>
 
           <TabsContent value="inbox" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6"> {/* Adjusted gap for mobile */}
               {/* Enhanced Lead Inbox */}
               <div className="lg:col-span-2">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
+                    <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0"> {/* Adjusted for stacking on small screens */}
                       <span>Lead Inbox</span>
                       <div className="flex items-center gap-2">
                         <Badge variant="secondary">{filteredLeads.length} leads</Badge>
@@ -327,36 +378,38 @@ const Dashboard = () => {
                             onClick={() => setSelectedLead(lead)}
                           >
                             <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-3 mb-2">
+                              <div className="flex-1 min-w-0"> {/* Added min-w-0 to prevent overflow */}
+                                <div className="flex items-center space-x-1 sm:space-x-3 mb-2 flex-wrap"> {/* Added flex-wrap for badges */}
                                   {getStatusIcon(lead.status)}
-                                  <span className="font-semibold text-gray-900">
+                                  <span className="font-semibold text-gray-900 truncate"> {/* Added truncate */}
                                     {lead.firstName} {lead.lastName}
                                   </span>
-                                  <Badge variant="outline" className="text-xs">
+                                  <Badge variant="outline" className="text-xs flex-shrink-0"> {/* Added flex-shrink-0 */}
                                     {lead.id}
                                   </Badge>
                                   {lead.urgency === 'emergency' && (
-                                    <Badge className="bg-red-500 text-white animate-pulse">
+                                    <Badge className="bg-red-500 text-white animate-pulse flex-shrink-0"> {/* Added flex-shrink-0 */}
                                       URGENT
                                     </Badge>
                                   )}
                                 </div>
-                                <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
+                                <div className="flex flex-wrap items-center space-x-2 sm:space-x-4 text-sm text-gray-600 mb-2"> {/* Added flex-wrap for vehicle/phone */}
                                   <span className="flex items-center">
                                     <Car className="h-3 w-3 mr-1" />
-                                    {lead.year} {lead.make} {lead.model}
+                                    <span className="truncate"> {/* Truncate vehicle info */}
+                                      {lead.year} {lead.make} {lead.model}
+                                    </span>
                                   </span>
                                   <span className="flex items-center">
                                     <Phone className="h-3 w-3 mr-1" />
                                     {lead.phone}
                                   </span>
                                 </div>
-                                <p className="text-sm text-gray-700 truncate">
+                                <p className="text-sm text-gray-700 truncate"> {/* Added truncate */}
                                   {lead.damageDescription}
                                 </p>
                               </div>
-                              <div className="text-right space-y-2 ml-4">
+                              <div className="text-right space-y-1 ml-2 flex-shrink-0"> {/* Adjusted margin and flex-shrink-0 */}
                                 {getStatusBadge(lead.status)}
                                 {getUrgencyBadge(lead.urgency)}
                                 <p className="text-xs text-gray-500">
