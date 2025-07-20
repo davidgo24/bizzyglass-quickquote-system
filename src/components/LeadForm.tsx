@@ -265,10 +265,13 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
   };
 
   const handleSubmit = async () => {
+    
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
+
     try {
       const cleanedPhone = formData.phone.replace(/\D/g, '');
 
-      const response = await fetch('/api/leads', {
+      const response = await fetch(`${baseUrl}/api/leads`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

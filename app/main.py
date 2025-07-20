@@ -31,6 +31,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+
+
 app.include_router(stripe_routes.router)
 
 
@@ -389,3 +392,6 @@ async def receive_incoming_sms(request: Request, db: Session = Depends(get_db)):
 
     print(f"📩 Received reply from {from_number}: {body}")
     return "OK"
+
+
+

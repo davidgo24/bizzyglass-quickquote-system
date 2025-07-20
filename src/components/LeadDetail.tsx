@@ -145,9 +145,10 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
     if (!newMessage.trim()) return;
 
     const cleanMessage = stripLinksFromMessage(newMessage);
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
 
     try {
-      const response = await fetch(`/api/leads/${lead.id}/messages`,
+      const response = await fetch(`${baseUrl}/api/leads/${lead.id}/messages`,
         {
           method: 'POST',
           headers: {
@@ -442,8 +443,11 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
 
   useEffect(() => {
     intervalRef.current = setInterval(async () => {
+  
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
+      
       try {
-        const res = await fetch(`/api/leads/${lead.id}`);
+        const res = await fetch(`${baseUrl}/api/leads/${lead.id}`);
         if (res.ok) {
           const data = await res.json();
           const incomingMessages = data.messages;

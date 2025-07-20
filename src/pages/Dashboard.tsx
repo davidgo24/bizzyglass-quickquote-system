@@ -96,8 +96,9 @@ const Dashboard = () => {
     }
 
     const fetchLeads = async () => {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
       try {
-        const response = await fetch('/api/leads');
+        const response = await fetch(`${baseUrl}/api/leads`);
         if (!response.ok) {
           throw new Error('Failed to fetch leads');
         }
