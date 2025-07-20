@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react'; // Ensure React is imported
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -145,13 +145,11 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
   };
 
   const validatePhoneNumber = (phone: string): boolean => {
-    // Strips non-digits and checks for 10 digits
     const cleaned = phone.replace(/\D/g, '');
     return cleaned.length === 10;
   };
 
   const validateEmail = (email: string): boolean => {
-    // Basic email regex for format validation
     const re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     return re.test(String(email).toLowerCase());
   };
@@ -186,7 +184,6 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
         if (!formData.make || !formData.model || !formData.year || !formData.bodyType) {
           return false;
         }
-        // VIN is optional, so no validation needed here for it to pass
         return true;
       case 3:
         if (formData.glassToReplace.length === 0 || !formData.urgency) {
@@ -207,7 +204,6 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
     if (validateStep(step)) {
       setStep(step + 1);
     } else {
-      // Determine which toast message to show based on the failed validation
       switch (step) {
         case 1:
           if (!formData.firstName || !formData.lastName || !formData.phone || !formData.confirmPhone || !formData.email || !formData.confirmEmail) {
@@ -285,7 +281,7 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
           make: formData.make,
           model: formData.model,
           year: formData.year,
-          vin: formData.vin, // <--- ADDED VIN HERE!
+          vin: formData.vin,
           bodyType: formData.bodyType,
           urgency: formData.urgency,
           damageDescription: `Glass to replace: ${formData.glassToReplace.join(', ')}${formData.addonServices.length ? `. Add-on services: ${formData.addonServices.join(', ')}` : ''}${formData.additionalNotes ? `. Additional notes: ${formData.additionalNotes}` : ''}`,
@@ -294,10 +290,6 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
           preferredDate: formData.preferredDate,
           preferredTime: formData.preferredTime,
           preferredDaysTimes: formData.preferredDaysTimes,
-          // Photos are not sent directly in this JSON payload,
-          // they would require a separate multipart/form-data upload.
-          // additionalNotes is already part of damageDescription for now,
-          // but could be sent separately if backend schema allows.
           messages: [
             {
               id: Date.now().toString(),
@@ -319,11 +311,11 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
       });
 
       onClose();
-    } catch (error) {
+    } catch (error: any) { // Explicitly type error as 'any' for message property
       console.error('Error submitting lead:', error);
       toast({
         title: "Error submitting request",
-        description: "Something went wrong. Please try again later.",
+        description: error.message || "Something went wrong. Please try again later.",
         variant: "destructive"
       });
     }
@@ -334,7 +326,7 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
       case 1:
         return (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="firstName">First Name *</Label>
                 <Input
@@ -647,9 +639,9 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
               />
             </div>
             
-            <div className="bg-blue-50 rounded-lg p-4">
-              <h3 className="font-semibold text-blue-900 mb-2">What happens next?</h3>
-              <ul className="text-blue-800 text-sm space-y-1">
+            <div className="bg-orange-50 rounded-lg p-4"> {/* NEW COLOR */}
+              <h3 className="font-semibold text-orange-900 mb-2">What happens next?</h3> {/* NEW COLOR */}
+              <ul className="text-orange-800 text-sm space-y-1"> {/* NEW COLOR */}
                 <li>• You'll receive an SMS confirmation within minutes</li>
                 <li>• Our team will review your request and send a quote</li>
                 <li>• Schedule your convenient service time</li>
@@ -681,7 +673,7 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
           {/* Progress Bar */}
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div 
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              className="bg-gradient-to-r from-red-600 to-orange-500 h-2 rounded-full transition-all duration-300" // NEW COLOR
               style={{ width: `${(step / 5) * 100}%` }}
             />
           </div>
@@ -690,22 +682,30 @@ const LeadForm = ({ onClose }: LeadFormProps) => {
 
           <div className="flex gap-3 pt-4">
             {step > 1 && (
-              <Button variant="outline" onClick={() => setStep(step - 1)} className="flex-1">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setStep(step - 1)} 
+                className="flex-1 border-2 border-red-600 text-red-600 hover:bg-orange-50" // NEW COLOR
+              >
                 Back
               </Button>
             )}
             {step < 5 ? (
               <Button 
+                type="button" 
                 onClick={handleNext} 
-                className="flex-1 bg-blue-600 hover:bg-blue-700"
+                className="flex-1 bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600 text-white" // NEW COLOR
                 disabled={!validateStep(step)}
               >
                 Next
               </Button>
             ) : (
               <Button 
+                type="button" // Changed to type="button" to prevent implicit form submission
                 onClick={handleSubmit} 
-                className="flex-1 bg-green-600 hover:bg-green-700"
+                className="flex-1 bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600 text-white" // NEW COLOR, changed from green
+                disabled={!validateStep(step)} // Disable if validation fails
               >
                 Submit Request
               </Button>

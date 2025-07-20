@@ -5,15 +5,20 @@ import path from "path";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "::",
+    host: "::", // This is why allowedHosts is now required
     port: 8080,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://127.0.0.1:8080', // Using IP to avoid localhost resolution issues
         changeOrigin: true,
         secure: false,
       },
     },
+    allowedHosts: [
+      'localhost',
+      '127.0.0.1',
+      '604b247191dd.ngrok-free.app' // <--- IMPORTANT: UPDATED NGROK HOSTNAME (no protocol)
+    ]
   },
   plugins: [
     react()
