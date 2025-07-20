@@ -11,6 +11,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { X, Send, DollarSign, Calendar, Clock, Phone, Mail, Car, User, MessageSquare, CreditCard, CheckCircle, Percent } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { StripeLinkGenerator } from './stripelinkgenerator';
+import { useEffect, useRef } from 'react';
+
 
 interface Lead {
   id: string;
@@ -50,6 +52,8 @@ interface LeadDetailProps {
 
 const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
   const [newMessage, setNewMessage] = useState('');
+  const [latestMessages, setLatestMessages] = useState<Message[]>(lead.messages);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   interface ServiceItem {
     id: string;
@@ -435,6 +439,45 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
       slot.id === id ? { ...slot, [field]: value } : slot
     ));
   };
+
+  useEffect(() => {
+    intervalRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/leads/${lead.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          const incomingMessages = data.messages;
+  
+          // Compare lengths or latest message IDs
+          if (incomingMessages.length > latestMessages.length) {
+            setLatestMessages(incomingMessages);
+            toast({
+              title: "New Message",
+              description: "Click to refresh to see the latest message.",
+              duration: 5000,
+              action: (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    onLeadUpdate(data);
+                  }}
+                >
+                  Refresh
+                </Button>
+              ),
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Polling error:", error);
+      }
+    }, 15000); // every 15 seconds
+  
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [lead.id, latestMessages]);
+  
 
   return(
     <Card className="h-fit">
@@ -893,7 +936,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
         <div>
           <Label className="text-sm font-medium">Conversation</Label>
           <div className="mt-2 space-y-3 max-h-40 overflow-y-auto">
-            {lead.messages && lead.messages.map((message, index) => (
+          {latestMessages && latestMessages.map((message, index) => (
               <div key={index} className={`p-3 rounded-lg text-sm ${
                 message.sender === 'owner' ? 'bg-blue-100 ml-4' : 'bg-gray-100 mr-4'
               }`}>

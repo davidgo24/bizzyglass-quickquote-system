@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, status, Depends
+from fastapi import FastAPI, HTTPException, status, Depends, Request
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, timezone
@@ -15,6 +15,7 @@ from app.database import engine, Base, get_db
 from app.models import Lead as DBLead
 from app.routes import stripe_routes
 from app.schemas import LeadCreate, MessageCreate, QuotePayload, StripeCheckoutRequest, Lead, Message, FinalQuoteMessagePayload
+
 
 
 load_dotenv()
@@ -351,3 +352,40 @@ def send_final_quote(payload: FinalQuoteMessagePayload, db: Session = Depends(ge
 
     send_sms(lead.phone, new_message.message)
     return lead
+
+@app.post("/api/twilio-webhook")
+async def receive_incoming_sms(request: Request, db: Session = Depends(get_db)):
+    form_data = await request.form()
+    from_number = form_data.get("From")
+    body = form_data.get("Body")
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    if not from_number or not body:
+        raise HTTPException(status_code=400, detail="Missing From or Body")
+
+    # Normalize number for DB matching
+    normalized_number = from_number.replace("+1", "").replace("-", "").replace(" ", "")
+
+    # Find the matching lead by phone number
+    lead = db.query(DBLead).filter(DBLead.phone.ilike(f"%{normalized_number[-10:]}")).first()
+    if not lead:
+        print(f"No matching lead found for number: {from_number}")
+        return "OK"
+
+    if lead.messages is None:
+        lead.messages = []
+
+    incoming_message = Message(
+        id=str(len(lead.messages) + 1),
+        sender="client",
+        message=body,
+        timestamp=timestamp
+    )
+    lead.messages.append(incoming_message.dict())
+    flag_modified(lead, "messages")
+
+    db.add(lead)
+    db.commit()
+
+    print(f"📩 Received reply from {from_number}: {body}")
+    return "OK"
