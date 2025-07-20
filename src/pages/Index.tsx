@@ -25,11 +25,11 @@ const Index = () => {
   const paymentBrandingBadges = (
     <div className="flex flex-wrap justify-center gap-2 mt-3">
       {/* Assuming these are full-color official SVGs now */}
-      <img src="/src/assets/visa.svg" alt="Visa" className="h-6"/>
-      <img src="/src/assets/apple.svg" alt="Apple Pay" className="h-6"/>
-      <img src="/src/assets/mastercard.svg" alt="MasterCard" className="h-6"/> {/* This should be your full-color Mastercard SVG */}
-      <img src="/src/assets/amex.svg" alt="American Express" className="h-6"/>
-      <img src="/src/assets/stripe.svg" alt="Stripe" className="h-6"/>
+      <img src="visa.svg" alt="Visa" className="h-6"/>
+      <img src="apple.svg" alt="Apple Pay" className="h-6"/>
+      <img src="mastercard.svg" alt="MasterCard" className="h-6"/> {/* This should be your full-color Mastercard SVG */}
+      <img src="amex.svg" alt="American Express" className="h-6"/>
+      <img src="stripe.svg" alt="Stripe" className="h-6"/>
     </div>
   );
 
