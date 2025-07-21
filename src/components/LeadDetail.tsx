@@ -242,7 +242,8 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
     };
 
     try {
-      const response = await fetch('/api/generate-quote-message', {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
+      const response = await fetch(`${baseUrl}/api/generate-quote-message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -283,7 +284,8 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
     }
 
     try {
-      const response = await fetch('/api/send-final-quote', {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
+      const response = await fetch(`${baseUrl}/api/send-final-quote`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -445,7 +447,7 @@ const LeadDetail = ({ lead, onClose, onLeadUpdate }: LeadDetailProps) => {
     intervalRef.current = setInterval(async () => {
   
       const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
-      
+
       try {
         const res = await fetch(`${baseUrl}/api/leads/${lead.id}`);
         if (res.ok) {
