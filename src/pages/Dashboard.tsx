@@ -95,17 +95,22 @@ const Dashboard = () => {
       setIsAuthenticated(true);
     }
 
-    const fetchLeads = async () => {
+    const fetchLeads = async (retries = 5, delay = 1000) => {
       const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
       try {
         const response = await fetch(`${baseUrl}/api/leads`);
         if (!response.ok) {
-          throw new Error('Failed to fetch leads');
+          throw new Error(`Server returned ${response.status}`);
         }
         const data = await response.json();
         setLeads(data);
       } catch (error) {
-        console.error('Error fetching leads:', error);
+        if (retries > 0) {
+          console.warn(`Retrying fetchLeads... (${retries} retries left)`);
+          await new Promise((r) => setTimeout(r, delay));
+          return fetchLeads(retries - 1, delay * 1.5);
+        }
+        console.error("Error fetching leads:", error);
         toast({
           title: "Error fetching leads",
           description: "Could not load leads from the server.",
